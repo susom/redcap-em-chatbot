@@ -42,12 +42,10 @@
 	],
 
     "auth-ajax-actions": [
-        "TestAction",
         "callAI"
     ],
 
     "no-auth-ajax-actions": [
-        "TestAction",
         "callAI"
     ],
 

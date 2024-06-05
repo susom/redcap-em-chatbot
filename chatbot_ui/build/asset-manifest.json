@@ -1,17 +1,17 @@
 {
   "files": {
     "main.css": "/static/css/main.58e03a2a.css",
-    "main.js": "/static/js/main.cfe98636.js",
+    "main.js": "/static/js/main.d3c25e72.js",
     "static/js/787.90a53ece.chunk.js": "/static/js/787.90a53ece.chunk.js",
     "static/media/chatGPT_logo.png": "/static/media/chatGPT_logo.e13240ec1a85c5048927.png",
     "service-worker.js": "/service-worker.js",
     "index.html": "/index.html",
     "main.58e03a2a.css.map": "/static/css/main.58e03a2a.css.map",
-    "main.cfe98636.js.map": "/static/js/main.cfe98636.js.map",
+    "main.d3c25e72.js.map": "/static/js/main.d3c25e72.js.map",
     "787.90a53ece.chunk.js.map": "/static/js/787.90a53ece.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.58e03a2a.css",
-    "static/js/main.cfe98636.js"
+    "static/js/main.d3c25e72.js"
   ]
 }

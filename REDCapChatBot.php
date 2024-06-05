@@ -14,7 +14,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 		parent::__construct();
 
         // Instantiate your SecureChatAI and assign to a property.
-        $moduleDirectoryPrefix = "SecureChatAI";
+        $moduleDirectoryPrefix = "wtf";
         $this->secureChatInstance = \ExternalModules\ExternalModules::getModuleInstance($moduleDirectoryPrefix);
     }
 
@@ -52,7 +52,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     public function injectIntegrationUI()
     {
-        $this->injectJSMO(null, "InitFunction");
+        $this->injectJSMO(null, );
 
         $build_files = $this->generateAssetFiles();
 
@@ -113,24 +113,17 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      */
     public function sanitizeInput($payload): array|string
     {
-        // Initialize a sanitized array
         $sanitizedPayload = array();
 
-        // Only proceed if payload is indeed an array (as expected)
         if (is_array($payload)) {
             foreach ($payload as $message) {
-
-                // Ensure each message in the payload has necessary attributes and they are in correct type.
                 if (
                     isset($message['role']) && is_string($message['role']) &&
                     isset($message['content']) && is_string($message['content'])
                 ) {
-                    // Further sanitization might be required based on the logic of your system;
-                    // here we are using a simple built-in PHP function as an example:
                     $sanitizedRole = filter_var($message['role'], FILTER_SANITIZE_STRING);
                     $sanitizedContent = filter_var($message['content'], FILTER_SANITIZE_STRING);
 
-                    // Add the sanitized message to the sanitizedPayload
                     $sanitizedPayload[] = array(
                         'role' => $sanitizedRole,
                         'content' => $sanitizedContent
@@ -141,6 +134,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
         return $sanitizedPayload;
     }
+
 
     public function formatResponse($response) {
         // Extract data from the response
@@ -187,17 +181,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id)
     {
         switch ($action) {
-            case "TestAction":
-                $messages = array(
-                    array("role"=> "user", "content" => "tell me a mom joke")
-                );
-                $response   = $this->secureChatInstance->callAI($messages);
-                $result     = $this->formatResponse($response);
-                $this->emDebug("calling TestAction and then SecureChatAI", $result);
-                return json_encode($result);
-
             case "callAI":
                 $messages   = $this->sanitizeInput($payload);
+                $this->emDebug("hey payload wtf", $payload, $messages);
+
                 $response   = $this->secureChatInstance->callAI($messages);
                 $result     = $this->formatResponse($response);
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
