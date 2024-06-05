@@ -11,6 +11,7 @@ export const ChatContextProvider = ({ children }) => {
     const [msgCount, setMsgCount] = useState(0);
 
     const addMessage = (message) => {
+        console.log("Adding message:", message);
         setApiContext([
             ...apiContext,
             { role: message.role, content: message.content },
@@ -28,6 +29,7 @@ export const ChatContextProvider = ({ children }) => {
                 output_cost: message.output_cost || null,
             },
         ]);
+        console.log("Updated chatContext:", chatContext);
     };
 
     const updateMessage = (messageContent, index) => {
@@ -38,6 +40,7 @@ export const ChatContextProvider = ({ children }) => {
                 ...updatedState[index],
                 assistant_content: messageContent,
             };
+            console.log("Updated chatContext after updateMessage:", updatedState);
             return updatedState;
         });
     };
@@ -56,6 +59,7 @@ export const ChatContextProvider = ({ children }) => {
     };
 
     const callAjax = (payload) => {
+        console.log("callAjax invoked with payload:", payload);
         addMessage({ role: 'user', content: payload.content });
         const userMessageIndex = chatContext.length;
         console.log("Added user message, index:", userMessageIndex);
@@ -63,8 +67,9 @@ export const ChatContextProvider = ({ children }) => {
         const wrappedPayload = [payload];
 
         window.chatbot_jsmo_module.callAI(wrappedPayload, (res) => {
+            console.log("Received response from callAI:", res);
             if (res && res.content) {
-                console.log("Received response from callAI:", res);
+                console.log("Valid response received:", res.content);
                 updateMessage(res.content, userMessageIndex);
             } else {
                 console.log("Unexpected response format:", res);

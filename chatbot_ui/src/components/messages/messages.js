@@ -36,11 +36,10 @@ export const Messages = () => {
             addChatThumb(session_id, new_thumb_obj);
         }
 
+        const hover_value = enter ? 1 : 0;
         if (up_thumb) {
-            const hover_value = enter ? 1 : 0;
             updateChatThumb(session_id, "up_hover", hover_value);
         } else {
-            const hover_value = enter ? 1 : 0;
             updateChatThumb(session_id, "down_hover", hover_value);
         }
     };
@@ -56,7 +55,7 @@ export const Messages = () => {
         } catch (error) {
             console.error("Error:", error);
         }
-    }
+    };
 
     const getVotesElement = () => {
         if (newQaRef.current) {
@@ -90,19 +89,22 @@ export const Messages = () => {
                         chat_context.chatContext.map((message, index) => (
                             <dl key={index} ref={index === chat_context.chatContext.length - 1 ? newQaRef : null}>
                                 <dt>{message.user_content}</dt>
-                                <dd>{message.assistant_content}
-                                    <div className={'msg_meta'}>
-                                        <div className={`votes`}>
-                                            {chat_context.showRatingPO ? popoverOverlay : ""}
-                                            <div className={`vote up`} onMouseEnter={(e) => { handleMouseEnterLeave(1, 1, message.id) }} onMouseLeave={(e) => { handleMouseEnterLeave(0, 1, message.id) }} onClick={(e) => { handleClick(1, message) }}>
-                                                {chatThumbs.hasOwnProperty(message.id) && (chatThumbs[message.id]["up_hover"] || message.rating === 1) ? (<HandThumbsUpFill color="#ccc" size={20}/>) : (<HandThumbsUp color="#ccc" size={20}/>)}
-                                            </div>
-                                            <div className={`vote down`} onMouseEnter={(e) => { handleMouseEnterLeave(1, 0, message.id) }} onMouseLeave={(e) => { handleMouseEnterLeave(0, 0, message.id) }} onClick={(e) => { handleClick(0, message) }}>
-                                                {chatThumbs.hasOwnProperty(message.id) && (chatThumbs[message.id]["down_hover"] || message.rating === 0) ? (<HandThumbsDownFill color="#ccc" size={20}/>) : (<HandThumbsDown color="#ccc" size={20}/>)}
+                                {message.assistant_content && (
+                                    <dd>
+                                        {message.assistant_content}
+                                        <div className={'msg_meta'}>
+                                            <div className={`votes`}>
+                                                {chat_context.showRatingPO ? popoverOverlay : ""}
+                                                <div className={`vote up`} onMouseEnter={() => { handleMouseEnterLeave(true, true, message.id) }} onMouseLeave={() => { handleMouseEnterLeave(false, true, message.id) }} onClick={() => { handleClick(1, message) }}>
+                                                    {chatThumbs.hasOwnProperty(message.id) && (chatThumbs[message.id]["up_hover"] || message.rating === 1) ? (<HandThumbsUpFill color="#ccc" size={20}/>) : (<HandThumbsUp color="#ccc" size={20}/>)}
+                                                </div>
+                                                <div className={`vote down`} onMouseEnter={() => { handleMouseEnterLeave(true, false, message.id) }} onMouseLeave={() => { handleMouseEnterLeave(false, false, message.id) }} onClick={() => { handleClick(0, message) }}>
+                                                    {chatThumbs.hasOwnProperty(message.id) && (chatThumbs[message.id]["down_hover"] || message.rating === 0) ? (<HandThumbsDownFill color="#ccc" size={20}/>) : (<HandThumbsDown color="#ccc" size={20}/>)}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </dd>
+                                    </dd>
+                                )}
                             </dl>
                         ))
                     )
