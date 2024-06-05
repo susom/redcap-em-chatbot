@@ -41,6 +41,16 @@
 
 	],
 
+    "auth-ajax-actions": [
+        "TestAction",
+        "callAI"
+    ],
+
+    "no-auth-ajax-actions": [
+        "TestAction",
+        "callAI"
+    ],
+
 	"project-settings": [
 		{
 			"key": "enable-project-debug-logging",

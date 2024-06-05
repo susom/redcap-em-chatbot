@@ -1,0 +1,46 @@
+
+.footer {
+    background:#fff;
+    border-radius: 0 0 10px 10px;
+}
+
+.footer button {
+    background:none;
+    border:none;
+}
+
+.footer .user_input {
+    border: none;
+    width: 82%;
+    padding: 10px 0;
+}
+
+.footer .user_input:focus {
+  outline: none;
+}
+
+
+.footer button .sendfill.rotate{
+    display:initial;
+    animation: rotate 2s linear infinite;
+}
+
+.footer button.clear_chat{
+  padding-left:0;
+  margin-right: 5px;
+  border-right: 1px dotted #ccc;
+}
+
+.footer button .sendfill,
+.footer button .send.off{
+    display:none;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

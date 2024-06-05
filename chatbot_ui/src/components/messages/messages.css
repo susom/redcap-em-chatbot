@@ -1,0 +1,86 @@
+.messages {
+    padding:30px 0 10px;
+    overflow:hidden;
+}
+
+.messages .empty{
+    padding:10px 0;
+    color:#9DA5B1;
+}
+
+.messages dl {
+    overflow:hidden;
+}
+
+.messages dt:before {
+    content:"Visitor";
+    position:absolute;
+    right:0; top:-20px;
+    height:20px; 
+    color:#9DA5B1;
+    font-size: 77%;
+}
+
+.messages dd:before {
+    content:"Powered by chatGPT";
+    position:absolute;
+    left:-25px; top:-20px;
+    padding-left:25px;
+    height:20px; 
+    background:url(../../assets/images/chatGPT_logo.png) 0 50% no-repeat;
+    background-size:20px;
+    color:#9DA5B1;
+    font-size: 77%;
+}
+
+.messages dt {
+    float: right;
+    width: 85%;
+    border-radius: 10px 10px 3px 10px;
+    background: #2846E4;
+    color: #fff;
+    padding: 10px 15px;
+    text-align: left;
+    min-height: 50px;
+    font-weight: normal;
+    margin-bottom:30px;
+    margin-right:12px;
+    position:relative;
+}
+
+.messages dd {
+    float: left;
+    width: 90%;
+    border-radius: 3px 10px 10px 10px;
+    background: #E9EEF3;
+    color: #000;
+    padding: 10px 15px;
+    text-align: left;
+    min-height: 50px;
+    margin-bottom:30px;
+    margin-left:25px;
+    position:relative;
+}
+
+.soft_text {
+    color:#9DA5B1;
+}
+
+.msg_meta {
+    overflow:hidden;
+}
+.votes{
+    overflow: hidden;
+    float: right;
+}
+.vote{
+    display:inline-block;
+    cursor:pointer;
+    margin-left:3px;
+}
+
+.token_usage{
+    float: left;
+    font-size: 77%;
+    margin-top: 5px;
+}

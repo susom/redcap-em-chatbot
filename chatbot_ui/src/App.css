@@ -1,0 +1,30 @@
+#chatbot_ui_container {
+    position: fixed; /* Stick to the viewport */
+    bottom: 20px; /* Distance from the bottom */
+    right: 20px; /* Distance from the right */
+    border-radius:10px;
+    border:1px solid #999;
+    z-index:9999;
+    overflow: hidden; /* To manage overflow */
+    background: #2C2C2C; /* Assuming you want the same background */
+}
+
+.App {
+    width: auto; /* Make .App fill the container */
+    height: auto; /* Adjust height as necessary, or make it auto based on content */
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
