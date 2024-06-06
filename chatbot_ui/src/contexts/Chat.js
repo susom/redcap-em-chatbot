@@ -79,7 +79,7 @@ export const ChatContextProvider = ({ children }) => {
         setMsgCount(session.queries.length);
     };
 
-    const callAjax = (payload) => {
+    const callAjax = (payload, callback) => {
         // Add user message to the contexts
         addMessage({ role: 'user', content: payload.content });
 
@@ -92,12 +92,15 @@ export const ChatContextProvider = ({ children }) => {
 
         window.chatbot_jsmo_module.callAI(wrappedPayload, (res) => {
             if (res && res.response) {
+                console.log("Valid response received:", res);
                 updateMessage(res, userMessageIndex);
+                if (callback) callback();
             } else {
                 console.log("Unexpected response format:", res);
             }
         }, (err) => {
             console.log("callAI error", err);
+            if (callback) callback();
         });
     };
 

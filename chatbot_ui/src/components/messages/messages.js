@@ -87,25 +87,32 @@ export const Messages = () => {
                 chat_context && chat_context.chatContext && chat_context.chatContext.length > 0
                     ? (
                         chat_context.chatContext.map((message, index) => (
-                            <dl key={index} ref={index === chat_context.chatContext.length - 1 ? newQaRef : null}>
-                                <dt>{message.user_content}</dt>
-                                {message.assistant_content && (
-                                    <dd>
-                                        {message.assistant_content}
-                                        <div className={'msg_meta'}>
-                                            <div className={`votes`}>
-                                                {chat_context.showRatingPO ? popoverOverlay : ""}
-                                                <div className={`vote up`} onMouseEnter={() => { handleMouseEnterLeave(true, true, message.id) }} onMouseLeave={() => { handleMouseEnterLeave(false, true, message.id) }} onClick={() => { handleClick(1, message) }}>
-                                                    {chatThumbs.hasOwnProperty(message.id) && (chatThumbs[message.id]["up_hover"] || message.rating === 1) ? (<HandThumbsUpFill color="#ccc" size={20}/>) : (<HandThumbsUp color="#ccc" size={20}/>)}
+                            <React.Fragment key={index}>
+                                <dl ref={index === chat_context.chatContext.length - 1 ? newQaRef : null}>
+                                    <dt>{message.user_content}</dt>
+                                    {message.assistant_content && (
+                                        <dd>
+                                            {message.assistant_content}
+                                            <div className={'msg_meta'}>
+                                                <div className={'token_usage'}>
+                                                    <div>Input Tokens: {message.input_tokens}</div>
+                                                    <div>Output Tokens: {message.output_tokens}</div>
                                                 </div>
-                                                <div className={`vote down`} onMouseEnter={() => { handleMouseEnterLeave(true, false, message.id) }} onMouseLeave={() => { handleMouseEnterLeave(false, false, message.id) }} onClick={() => { handleClick(0, message) }}>
-                                                    {chatThumbs.hasOwnProperty(message.id) && (chatThumbs[message.id]["down_hover"] || message.rating === 0) ? (<HandThumbsDownFill color="#ccc" size={20}/>) : (<HandThumbsDown color="#ccc" size={20}/>)}
+                                                <div className={`votes`}>
+                                                    {chat_context.showRatingPO ? popoverOverlay : ""}
+                                                    <div className={`vote up`} onMouseEnter={() => { handleMouseEnterLeave(true, true, message.id) }} onMouseLeave={() => { handleMouseEnterLeave(false, true, message.id) }} onClick={() => { handleClick(1, message) }}>
+                                                        {chatThumbs.hasOwnProperty(message.id) && (chatThumbs[message.id]["up_hover"] || message.rating === 1) ? (<HandThumbsUpFill color="#ccc" size={20}/>) : (<HandThumbsUp color="#ccc" size={20}/>)}
+                                                    </div>
+                                                    <div className={`vote down`} onMouseEnter={() => { handleMouseEnterLeave(true, false, message.id) }} onMouseLeave={() => { handleMouseEnterLeave(false, false, message.id) }} onClick={() => { handleClick(0, message) }}>
+                                                        {chatThumbs.hasOwnProperty(message.id) && (chatThumbs[message.id]["down_hover"] || message.rating === 0) ? (<HandThumbsDownFill color="#ccc" size={20}/>) : (<HandThumbsDown color="#ccc" size={20}/>)}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </dd>
-                                )}
-                            </dl>
+                                        </dd>
+                                    )}
+                                </dl>
+                                {index < chat_context.chatContext.length - 1 && <hr className="divider" />}
+                            </React.Fragment>
                         ))
                     )
                     : (<p className={`empty`}><em className={`soft_text`}>Ask me anything!</em></p>)

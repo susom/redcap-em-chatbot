@@ -16,22 +16,25 @@
     content:"Visitor";
     position:absolute;
     right:0; top:-20px;
-    height:20px; 
+    height:20px;
     color:#9DA5B1;
     font-size: 77%;
 }
 
 .messages dd:before {
-    content:"Powered by chatGPT";
-    position:absolute;
-    left:-25px; top:-20px;
-    padding-left:25px;
-    height:20px; 
-    background:url(../../assets/images/chatGPT_logo.png) 0 50% no-repeat;
-    background-size:20px;
-    color:#9DA5B1;
+    content: "Powered by chatGPT";
+    position: absolute;
+    left: -25px;
+    top: -20px;
+    padding-left: 25px;
+    height: 20px;
+    background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAMAAADXqc3KAAAAZlBMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACLZRe2AAAAInRSTlMASPATMqv2+ukHlSZaav6i1rrBi8/fslKRHH+eCz1Vdm3Hv/0XbQAAAVdJREFUKM9dUtuWgyAQi9xvioCWaq3a///JHbR7zp6dNyZMJiQAd4loBj31G/7VPrPk4qiiEP4v+DZTZwGfB8ZMCva3vz2MaPBDjc/jOWp3D21V6kLXHTPrQufF6bX1+UupoSLM6iVgBb8IPGCdLofqIKeOyCT77Bad7oGqHHZNwAlfpnKOWgpvnoCksdAm1n7SkWMpxkRGO+e83YDJYc+JVAuph5OAZBEa1YtfQiIpCCxx5HlBpWWybxL7jxtXjoMavT7A19F9bkBSo2KZM3hiZIGI6qaSpDXAphk4BxII26W8h2y+QCagsGhMWcAj2b7egKcLeBpPAseTXudxNmCHU5X2kVZbP0y+gW4iQB1FuxaCeZDLXJCCl5oD6qAuIcCq3eX2apgjV4uW9ZuH01c+6vFu4V8Ed9mQDGNDbiF0k3n/yXzzgp44RpfYvP//KBvZPpgovscfi/EU6a8d7jkAAAAASUVORK5CYII=') 0 50% no-repeat;
+    background-size: 20px;
+    color: #9DA5B1;
     font-size: 77%;
 }
+
+
 
 .messages dt {
     float: right;
@@ -57,10 +60,15 @@
     padding: 10px 15px;
     text-align: left;
     min-height: 50px;
-    margin-bottom:30px;
+    margin-bottom:0px;
     margin-left:25px;
     position:relative;
 }
+
+.soft_text {
+    color:#9DA5B1;
+}
+
 
 .soft_text {
     color:#9DA5B1;
@@ -83,4 +91,11 @@
     float: left;
     font-size: 77%;
     margin-top: 5px;
+}
+
+.divider {
+    border: 0;
+    height: 1px;
+    background: #ccc;
+    margin: 15px 0;
 }

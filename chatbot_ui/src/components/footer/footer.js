@@ -13,7 +13,7 @@ function Footer({ changeView }) {
     const handleSubmit = () => {
         if (input.trim() === "") return;
         setLoading(true);
-        chat_context.callAjax({ role: 'user', content: input });
+        chat_context.callAjax({ role: 'user', content: input }, () => setLoading(false));
         setInput(""); // Clear input field
     };
 
