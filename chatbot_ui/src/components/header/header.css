@@ -12,6 +12,7 @@
     height: 30px;
     line-height: 160%;
     color: #fff;
+    cursor: pointer;
 }
 
 .rcchat_header button {
