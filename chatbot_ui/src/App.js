@@ -17,10 +17,6 @@ function App() {
         setCurrentView(viewName);
     };
 
-    // useEffect(() => {
-    //     console.log("Current View:", currentView);
-    // }, [currentView]); // Log on currentView change
-
     // Determine which component to render based on the current view
     let ViewComponent;
     switch (currentView) {

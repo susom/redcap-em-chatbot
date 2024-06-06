@@ -11,18 +11,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     protected $secureChatInstance;
 
     public function __construct() {
-		parent::__construct();
-
-        // Instantiate your SecureChatAI and assign to a property.
+        parent::__construct();
         $moduleDirectoryPrefix = "wtf";
         $this->secureChatInstance = \ExternalModules\ExternalModules::getModuleInstance($moduleDirectoryPrefix);
     }
 
-
-    public function redcap_every_page_top($project_id)
-    {
+    public function redcap_every_page_top($project_id) {
         try {
-            // in case we are loading record homepage load its the record children if existed
             preg_match('/redcap_v[\d\.].*\/index\.php/m', $_SERVER['SCRIPT_NAME'], $matches, PREG_OFFSET_CAPTURE);
             if (strpos($_SERVER['SCRIPT_NAME'], 'ProjectSetup') !== false || !empty($matches)) {
                 $this->injectIntegrationUI();
@@ -32,10 +27,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         }
     }
 
-    public function injectJSMO($data = null, $init_method = null): void
-    {
-        // Temporary Workaround for 14.3 bug not including External Module functions in window
-        // require APP_PATH_DOCROOT . "ExternalModules/manager/templates/hooks/every_page_top.php";
+    public function injectJSMO($data = null, $init_method = null): void {
         echo $this->initializeJavascriptModuleObject();
         $cmds = [
             "window.chatbot_jsmo_module = " . $this->getJavascriptModuleObjectName()
@@ -50,9 +42,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         <?php
     }
 
-    public function injectIntegrationUI()
-    {
-        $this->injectJSMO(null, );
+    public function injectIntegrationUI() {
+        $this->injectJSMO(null);
 
         $build_files = $this->generateAssetFiles();
 
@@ -64,13 +55,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         $this->emdebug("injectIntegrationUI() End");
     }
 
-    /**
-     * @return array
-     * Scans dist directory for frontend build files for dynamic injection
-     */
-    public function generateAssetFiles(): array
-    {
-        $assetFolders = ['css', 'js', 'media']; // Add the subdirectories you want to scan
+    public function generateAssetFiles(): array {
+        $assetFolders = ['css', 'js', 'media'];
         $cwd = $this->getModulePath();
         $assets = [];
 
@@ -96,7 +82,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 } elseif (str_contains($file, '.css')) {
                     $html = "<link rel='stylesheet' href='{$url}'>";
                 }
-                // Only add HTML if it's not empty (i.e., the file is a JS or CSS file)
                 if ($html !== '') {
                     $assets[] = $html;
                 }
@@ -106,13 +91,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $assets;
     }
 
-    /**
-     * Sanitizes user input in the action queue nested array
-     * @param $payload
-     * @return array|null
-     */
-    public function sanitizeInput($payload): array|string
-    {
+    public function sanitizeInput($payload): array|string {
         $sanitizedPayload = array();
 
         if (is_array($payload)) {
@@ -135,16 +114,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $sanitizedPayload;
     }
 
-
     public function formatResponse($response) {
-        // Extract data from the response
         $content = $this->secureChatInstance->extractResponseText($response);
         $role = $response['choices'][0]['message']['role'] ?? 'assistant';
         $id = $response['id'] ?? null;
         $model = $response['model'] ?? null;
         $usage = $response['usage'] ?? null;
 
-        // Format it into the desired output
         $formattedResponse = [
             'response' => [
                 'role' => $role,
@@ -158,41 +134,93 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $formattedResponse;
     }
 
-    /**
-     * This is the primary ajax handler for JSMO calls
-     * @param $action
-     * @param $payload
-     * @param $project_id
-     * @param $record
-     * @param $instrument
-     * @param $event_id
-     * @param $repeat_instance
-     * @param $survey_hash
-     * @param $response_id
-     * @param $survey_queue_hash
-     * @param $page
-     * @param $page_full
-     * @param $user_id
-     * @param $group_id
-     * @return array|array[]|bool
-     * @throws Exception
-     */
     public function redcap_module_ajax($action, $payload, $project_id, $record, $instrument, $event_id, $repeat_instance,
-                                       $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id)
-    {
+                                       $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
         switch ($action) {
             case "callAI":
-                $messages   = $this->sanitizeInput($payload);
+                $messages = $this->sanitizeInput($payload);
                 $this->emDebug("hey payload wtf", $payload, $messages);
 
-                $response   = $this->secureChatInstance->callAI($messages);
-                $result     = $this->formatResponse($response);
+                $response = $this->secureChatInstance->callAI($messages);
+                $result = $this->formatResponse($response);
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
                 return json_encode($result);
 
             default:
-                // Action not defined
-                throw new Exception ("Action $action is not defined");
+                throw new Exception("Action $action is not defined");
         }
     }
+
+    /**
+     * Store document embedding
+     * @param string $title
+     * @param string $content
+     * @return void
+     */
+    public function storeDocumentEmbedding($title, $content) {
+        $embedding = $this->generateEmbedding($content); // Generate embedding for the content
+        $serialized_embedding = serialize($embedding); // Serialize the embedding
+
+        $sql = "INSERT INTO document_embeddings (title, raw_content, embedding) VALUES (?, ?, ?)";
+        $params = [$title, $content, $serialized_embedding];
+        $this->query($sql, $params);
+    }
+
+    /**
+     * Generate embedding for a given text
+     * @param string $text
+     * @return array
+     */
+    private function generateEmbedding($text) {
+        // Placeholder for embedding generation logic using a pre-trained model
+        return [];
+    }
+
+    /**
+     * Retrieve relevant documents based on query
+     * @param string $query
+     * @return array
+     */
+    public function getRelevantDocuments($query) {
+        $query_embedding = $this->generateEmbedding($query); // Generate embedding for the query
+
+        $sql = "SELECT id, title, raw_content, embedding FROM document_embeddings";
+        $result = $this->query($sql, []);
+
+        $documents = [];
+        while ($row = db_fetch_assoc($result)) {
+            $document_embedding = unserialize($row['embedding']); // Deserialize the embedding
+            $similarity = $this->cosineSimilarity($query_embedding, $document_embedding); // Calculate cosine similarity
+
+            $documents[] = [
+                'id' => $row['id'],
+                'title' => $row['title'],
+                'raw_content' => $row['raw_content'],
+                'similarity' => $similarity
+            ];
+        }
+
+        // Sort documents by similarity
+        usort($documents, function($a, $b) {
+            return $b['similarity'] <=> $a['similarity'];
+        });
+
+        // Return top N documents
+        return array_slice($documents, 0, 5);
+    }
+
+    /**
+     * Calculate cosine similarity between two vectors
+     * @param array $vec1
+     * @param array $vec2
+     * @return float
+     */
+    private function cosineSimilarity($vec1, $vec2) {
+        $dot_product = array_sum(array_map(fn($a, $b) => $a * $b, $vec1, $vec2));
+        $magnitude1 = sqrt(array_sum(array_map(fn($x) => $x * $x, $vec1)));
+        $magnitude2 = sqrt(array_sum(array_map(fn($x) => $x * $x, $vec2)));
+
+        return $dot_product / ($magnitude1 * $magnitude2);
+    }
 }
+?>

@@ -1,5 +1,6 @@
 import React, { useContext, useRef, useEffect } from "react";
 import { Overlay, Popover } from 'react-bootstrap';
+import ReactMarkdown from "react-markdown";
 import { HandThumbsUp, HandThumbsDown, HandThumbsUpFill, HandThumbsDownFill, XCircleFill } from 'react-bootstrap-icons';
 import { ChatContext } from "../../contexts/Chat";
 import "./messages.css";
@@ -54,7 +55,7 @@ export const Messages = () => {
                                     </dt>
                                     {message.assistant_content && (
                                         <dd>
-                                            {message.assistant_content}
+                                            <ReactMarkdown>{message.assistant_content}</ReactMarkdown>
                                             <div className={'msg_meta'}>
                                                 <div className={'token_usage'}>
                                                     <div>Input Tokens: {message.input_tokens}</div>
