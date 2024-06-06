@@ -21,6 +21,7 @@ export const ChatContextProvider = ({ children }) => {
     const updateChatContext = (newContext) => {
         chatContextRef.current = newContext;
         setChatContext(newContext);
+        console.log("Updated chatContext:", newContext);
     };
 
     const addMessage = (message) => {
@@ -55,7 +56,6 @@ export const ChatContextProvider = ({ children }) => {
             model: model || null,
         };
         updateChatContext(updatedState);
-        console.log("Updated chatContext after updateMessage:", updatedState);
 
         const updatedApiContext = [
             ...apiContextRef.current,
@@ -92,7 +92,6 @@ export const ChatContextProvider = ({ children }) => {
 
         window.chatbot_jsmo_module.callAI(wrappedPayload, (res) => {
             if (res && res.response) {
-                console.log("Valid response received:", res);
                 updateMessage(res, userMessageIndex);
                 if (callback) callback();
             } else {
@@ -105,7 +104,7 @@ export const ChatContextProvider = ({ children }) => {
     };
 
     return (
-        <ChatContext.Provider value={{ messages, addMessage, clearMessages, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext }}>
+        <ChatContext.Provider value={{ messages, addMessage, clearMessages, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext }}>
             {children}
         </ChatContext.Provider>
     );

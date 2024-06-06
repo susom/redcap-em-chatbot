@@ -2,59 +2,18 @@ import React, { useContext, useRef, useEffect, useState } from "react";
 import { Overlay, Popover } from 'react-bootstrap';
 import { HandThumbsUp, HandThumbsDown, HandThumbsUpFill, HandThumbsDownFill } from 'react-bootstrap-icons';
 import { ChatContext } from "../../contexts/Chat";
-import axios from "axios";
 import "./messages.css";
 
 export const Messages = () => {
     const chat_context = useContext(ChatContext);
     const newQaRef = useRef(null);
-    const [chatThumbs, setChatThumbs] = useState({});
-    const new_thumb_obj = {
-        "up_hover": 0,
-        "down_hover": 0,
-    };
 
-    const addChatThumb = (session_id, value_obj) => {
-        setChatThumbs(prevState => ({
-            ...prevState,
-            [session_id]: value_obj,
-        }));
-    };
+    const handleClick = (vote, index) => {
+        const updatedChatContext = [...chat_context.chatContext];
+        updatedChatContext[index].rating = vote;
+        chat_context.updateChatContext(updatedChatContext);
 
-    const updateChatThumb = (session_id, propKey, newVal) => {
-        setChatThumbs(prevState => ({
-            ...prevState,
-            [session_id]: {
-                ...prevState[session_id],
-                [propKey]: newVal,
-            },
-        }));
-    };
-
-    const handleMouseEnterLeave = (enter, up_thumb, session_id) => {
-        if (!chatThumbs.hasOwnProperty(session_id)) {
-            addChatThumb(session_id, new_thumb_obj);
-        }
-
-        const hover_value = enter ? 1 : 0;
-        if (up_thumb) {
-            updateChatThumb(session_id, "up_hover", hover_value);
-        } else {
-            updateChatThumb(session_id, "down_hover", hover_value);
-        }
-    };
-
-    const handleClick = async (vote, storage_obj) => {
-        try {
-            storage_obj["rating"] = vote;
-            const result = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/rate`, { "storage_obj": storage_obj });
-            if (result.data.success === 1) {
-                // Removing updateSession since it's not defined and not needed for MVP
-                // updateSession(chat_context.sessionId, chat_context.chatContext);
-            }
-        } catch (error) {
-            console.error("Error:", error);
-        }
+        console.log("Updated chatContext after rating:", updatedChatContext);
     };
 
     const getVotesElement = () => {
@@ -100,11 +59,11 @@ export const Messages = () => {
                                                 </div>
                                                 <div className={`votes`}>
                                                     {chat_context.showRatingPO ? popoverOverlay : ""}
-                                                    <div className={`vote up`} onMouseEnter={() => { handleMouseEnterLeave(true, true, message.id) }} onMouseLeave={() => { handleMouseEnterLeave(false, true, message.id) }} onClick={() => { handleClick(1, message) }}>
-                                                        {chatThumbs.hasOwnProperty(message.id) && (chatThumbs[message.id]["up_hover"] || message.rating === 1) ? (<HandThumbsUpFill color="#ccc" size={20}/>) : (<HandThumbsUp color="#ccc" size={20}/>)}
+                                                    <div className={`vote up`} onClick={() => { handleClick(1, index) }}>
+                                                        {message.rating === 1 ? (<HandThumbsUpFill color="#ccc" size={20}/>) : (<HandThumbsUp color="#ccc" size={20}/>)}
                                                     </div>
-                                                    <div className={`vote down`} onMouseEnter={() => { handleMouseEnterLeave(true, false, message.id) }} onMouseLeave={() => { handleMouseEnterLeave(false, false, message.id) }} onClick={() => { handleClick(0, message) }}>
-                                                        {chatThumbs.hasOwnProperty(message.id) && (chatThumbs[message.id]["down_hover"] || message.rating === 0) ? (<HandThumbsDownFill color="#ccc" size={20}/>) : (<HandThumbsDown color="#ccc" size={20}/>)}
+                                                    <div className={`vote down`} onClick={() => { handleClick(0, index) }}>
+                                                        {message.rating === 0 ? (<HandThumbsDownFill color="#ccc" size={20}/>) : (<HandThumbsDown color="#ccc" size={20}/>)}
                                                     </div>
                                                 </div>
                                             </div>

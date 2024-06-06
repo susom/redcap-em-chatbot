@@ -1,23 +1,24 @@
 .messages {
-    padding:30px 0 10px;
-    overflow:hidden;
+    padding: 30px 0 10px;
+    overflow: hidden;
 }
 
-.messages .empty{
-    padding:10px 0;
-    color:#9DA5B1;
+.messages .empty {
+    padding: 10px 0;
+    color: #9DA5B1;
 }
 
 .messages dl {
-    overflow:hidden;
+    overflow: hidden;
 }
 
 .messages dt:before {
-    content:"Visitor";
-    position:absolute;
-    right:0; top:-20px;
-    height:20px;
-    color:#9DA5B1;
+    content: "Visitor";
+    position: absolute;
+    right: 0;
+    top: -20px;
+    height: 20px;
+    color: #9DA5B1;
     font-size: 77%;
 }
 
@@ -34,8 +35,6 @@
     font-size: 77%;
 }
 
-
-
 .messages dt {
     float: right;
     width: 85%;
@@ -46,9 +45,9 @@
     text-align: left;
     min-height: 50px;
     font-weight: normal;
-    margin-bottom:30px;
-    margin-right:12px;
-    position:relative;
+    margin-bottom: 30px;
+    margin-right: 12px;
+    position: relative;
 }
 
 .messages dd {
@@ -60,35 +59,35 @@
     padding: 10px 15px;
     text-align: left;
     min-height: 50px;
-    margin-bottom:0px;
-    margin-left:25px;
-    position:relative;
+    margin-bottom: 0px;
+    margin-left: 25px;
+    position: relative;
 }
 
 .soft_text {
-    color:#9DA5B1;
-}
-
-
-.soft_text {
-    color:#9DA5B1;
+    color: #9DA5B1;
 }
 
 .msg_meta {
-    overflow:hidden;
-}
-.votes{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end; /* Align items at the bottom */
     overflow: hidden;
-    float: right;
-}
-.vote{
-    display:inline-block;
-    cursor:pointer;
-    margin-left:3px;
+    margin-top: 10px;
 }
 
-.token_usage{
-    float: left;
+.votes {
+    display: flex;
+    align-items: center; /* Align votes at the bottom */
+}
+
+.vote {
+    display: inline-block;
+    cursor: pointer;
+    margin-left: 3px;
+}
+
+.token_usage {
     font-size: 77%;
     margin-top: 5px;
 }
