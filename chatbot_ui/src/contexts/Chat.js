@@ -1,4 +1,4 @@
-import React, { createContext, useState } from 'react';
+import React, { createContext, useState, useRef } from 'react';
 
 export const ChatContext = createContext();
 
@@ -10,45 +10,66 @@ export const ChatContextProvider = ({ children }) => {
     const [messages, setMessages] = useState([]);
     const [msgCount, setMsgCount] = useState(0);
 
-    const addMessage = (message) => {
-        console.log("Adding message:", message);
-        setApiContext([
-            ...apiContext,
-            { role: message.role, content: message.content },
-        ]);
+    const apiContextRef = useRef(apiContext);
+    const chatContextRef = useRef(chatContext);
 
-        setChatContext(prevState => [
-            ...prevState,
+    const updateApiContext = (newContext) => {
+        apiContextRef.current = newContext;
+        setApiContext(newContext);
+    };
+
+    const updateChatContext = (newContext) => {
+        chatContextRef.current = newContext;
+        setChatContext(newContext);
+    };
+
+    const addMessage = (message) => {
+        const updatedApiContext = [
+            ...apiContextRef.current,
+            { role: message.role, content: message.content },
+        ];
+        updateApiContext(updatedApiContext);
+
+        const newChatContext = [
+            ...chatContextRef.current,
             {
                 user_content: message.role === 'user' ? message.content : null,
                 assistant_content: message.role === 'assistant' ? message.content : null,
                 timestamp: new Date().getTime(),
-                input_tokens: message.input_tokens || null,
-                output_tokens: message.output_tokens || null,
-                input_cost: message.input_cost || null,
-                output_cost: message.output_cost || null,
             },
-        ]);
-        console.log("Updated chatContext:", chatContext);
+        ];
+        updateChatContext(newChatContext);
     };
 
-    const updateMessage = (messageContent, index) => {
-        console.log("Updating message at index:", index, "with content:", messageContent);
-        setChatContext(prevState => {
-            const updatedState = [...prevState];
-            updatedState[index] = {
-                ...updatedState[index],
-                assistant_content: messageContent,
-            };
-            console.log("Updated chatContext after updateMessage:", updatedState);
-            return updatedState;
-        });
+    const updateMessage = (response, index) => {
+        const { response: assistantResponse, usage, id, model } = response;
+        const updatedState = [...chatContextRef.current];
+        updatedState[index] = {
+            ...updatedState[index],
+            assistant_content: assistantResponse.content,
+            input_tokens: usage ? usage.prompt_tokens : null,
+            output_tokens: usage ? usage.completion_tokens : null,
+            input_cost: usage ? usage.input_cost : null,
+            output_cost: usage ? usage.output_cost : null,
+            id: id || null,
+            model: model || null,
+        };
+        updateChatContext(updatedState);
+        console.log("Updated chatContext after updateMessage:", updatedState);
+
+        const updatedApiContext = [
+            ...apiContextRef.current,
+            { role: 'assistant', content: assistantResponse.content },
+        ];
+        updateApiContext(updatedApiContext);
     };
 
     const clearMessages = () => {
         setMsgCount(0);
         setSessionId(null);
         setMessages([]);
+        updateChatContext([]);
+        updateApiContext([]);
     };
 
     const replaceSession = (session) => {
@@ -59,18 +80,19 @@ export const ChatContextProvider = ({ children }) => {
     };
 
     const callAjax = (payload) => {
-        console.log("callAjax invoked with payload:", payload);
+        // Add user message to the contexts
         addMessage({ role: 'user', content: payload.content });
-        const userMessageIndex = chatContext.length;
-        console.log("Added user message, index:", userMessageIndex);
 
-        const wrappedPayload = [payload];
+        // Calculate the index for the new message
+        const userMessageIndex = chatContextRef.current.length - 1; // This is important!
+
+        // Use the updated apiContext for the call
+        const wrappedPayload = [...apiContextRef.current];
+        console.log("calling callAI with ", wrappedPayload);
 
         window.chatbot_jsmo_module.callAI(wrappedPayload, (res) => {
-            console.log("Received response from callAI:", res);
-            if (res && res.content) {
-                console.log("Valid response received:", res.content);
-                updateMessage(res.content, userMessageIndex);
+            if (res && res.response) {
+                updateMessage(res, userMessageIndex);
             } else {
                 console.log("Unexpected response format:", res);
             }

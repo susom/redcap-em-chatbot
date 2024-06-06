@@ -10,7 +10,6 @@
             try {
                 // console.log("calling callAI() with payload:", payload);
                 const res = await module.ajax('callAI', payload);
-                // console.log("Received raw response from backend:", res);
 
                 let parsedRes;
                 try {
@@ -22,8 +21,7 @@
                 }
 
                 if (parsedRes?.response) {
-                    // console.log("Passing response to callback:", parsedRes.response);
-                    callback(parsedRes.response); // Pass the response object directly
+                    callback(parsedRes);
                 } else {
                     console.log("No response field in parsed response:", parsedRes);
                 }
