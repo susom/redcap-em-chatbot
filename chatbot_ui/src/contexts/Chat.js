@@ -33,16 +33,17 @@ export const ChatContextProvider = ({ children }) => {
     const updateChatContext = async (newContext, shouldSave = true) => {
         chatContextRef.current = newContext;
         setChatContext(newContext);
-        console.log("Updated chatContext:", newContext);
+        // console.log("Updated chatContext:", newContext);
         if (shouldSave) {
             await saveChatContext(); // Save chat session after each update
         }
     };
 
     const addMessage = (message) => {
+        const index = chatContextRef.current.length;
         const updatedApiContext = [
             ...apiContextRef.current,
-            { role: message.role, content: message.content },
+            { role: message.role, content: message.content, index },
         ];
         updateApiContext(updatedApiContext);
 
@@ -74,7 +75,7 @@ export const ChatContextProvider = ({ children }) => {
 
         const updatedApiContext = [
             ...apiContextRef.current,
-            { role: 'assistant', content: assistantResponse.content },
+            { role: 'assistant', content: assistantResponse.content, index },
         ];
         updateApiContext(updatedApiContext);
     };
@@ -126,11 +127,28 @@ export const ChatContextProvider = ({ children }) => {
             rating: vote
         };
         await updateChatContext(updatedState);
-        console.log("Updated chatContext after vote:", updatedState);
+        // console.log("Updated chatContext after vote:", updatedState);
+    };
+
+    const deleteInteraction = async (index) => {
+        const updatedChatContext = [...chatContextRef.current];
+        updatedChatContext.splice(index, 1);
+
+        const updatedApiContext = apiContextRef.current.filter(entry => entry.index !== index);
+
+        // Update the index of remaining entries
+        updatedApiContext.forEach((entry, i) => {
+            if (entry.index > index) {
+                entry.index -= 1;
+            }
+        });
+
+        updateChatContext(updatedChatContext);
+        updateApiContext(updatedApiContext);
     };
 
     return (
-        <ChatContext.Provider value={{ messages, addMessage, clearMessages, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote }}>
+        <ChatContext.Provider value={{ messages, addMessage, clearMessages, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote, deleteInteraction }}>
             {children}
         </ChatContext.Provider>
     );

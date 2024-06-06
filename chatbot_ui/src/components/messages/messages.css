@@ -98,3 +98,11 @@
     background: #ccc;
     margin: 15px 0;
 }
+
+.delete-icon {
+    float: right;
+    margin-left: 10px;
+    cursor: pointer;
+    color: red;
+}
+

@@ -1,6 +1,6 @@
 import React, { useContext, useRef, useEffect } from "react";
 import { Overlay, Popover } from 'react-bootstrap';
-import { HandThumbsUp, HandThumbsDown, HandThumbsUpFill, HandThumbsDownFill } from 'react-bootstrap-icons';
+import { HandThumbsUp, HandThumbsDown, HandThumbsUpFill, HandThumbsDownFill, XCircleFill } from 'react-bootstrap-icons';
 import { ChatContext } from "../../contexts/Chat";
 import "./messages.css";
 
@@ -10,6 +10,10 @@ export const Messages = () => {
 
     const handleClick = (vote, index) => {
         chat_context.updateVote(index, vote);
+    };
+
+    const handleDelete = (index) => {
+        chat_context.deleteInteraction(index);
     };
 
     const getVotesElement = () => {
@@ -44,7 +48,10 @@ export const Messages = () => {
                         chat_context.chatContext.map((message, index) => (
                             <React.Fragment key={index}>
                                 <dl ref={index === chat_context.chatContext.length - 1 ? newQaRef : null}>
-                                    <dt>{message.user_content}</dt>
+                                    <dt>
+                                        {message.user_content}
+                                        <XCircleFill className="delete-icon" onClick={() => handleDelete(index)} />
+                                    </dt>
                                     {message.assistant_content && (
                                         <dd>
                                             {message.assistant_content}
