@@ -1,4 +1,5 @@
-import React, { createContext, useState, useRef } from 'react';
+import React, { createContext, useState, useRef, useEffect } from 'react';
+import { saveNewSession, updateSession, getSession, deleteSession } from '../components/database/dexie';
 
 export const ChatContext = createContext();
 
@@ -6,7 +7,7 @@ export const ChatContextProvider = ({ children }) => {
     const [apiContext, setApiContext] = useState([]);
     const [chatContext, setChatContext] = useState([]);
     const [showRatingPO, setShowRatingPO] = useState(false);
-    const [sessionId, setSessionId] = useState(null);
+    const [sessionId, setSessionId] = useState(Date.now().toString());
     const [messages, setMessages] = useState([]);
     const [msgCount, setMsgCount] = useState(0);
 
@@ -18,10 +19,22 @@ export const ChatContextProvider = ({ children }) => {
         setApiContext(newContext);
     };
 
-    const updateChatContext = (newContext) => {
+    const saveChatContext = async () => {
+        if (sessionId) {
+            const currentSession = await getSession(sessionId);
+            if (currentSession) {
+                await updateSession(sessionId, chatContextRef.current);
+            } else {
+                await saveNewSession(sessionId, Date.now(), chatContextRef.current);
+            }
+        }
+    };
+
+    const updateChatContext = async (newContext) => {
         chatContextRef.current = newContext;
         setChatContext(newContext);
         console.log("Updated chatContext:", newContext);
+        await saveChatContext(); // Save chat session after each update
     };
 
     const addMessage = (message) => {
@@ -42,7 +55,7 @@ export const ChatContextProvider = ({ children }) => {
         updateChatContext(newChatContext);
     };
 
-    const updateMessage = (response, index) => {
+    const updateMessage = async (response, index) => {
         const { response: assistantResponse, usage, id, model } = response;
         const updatedState = [...chatContextRef.current];
         updatedState[index] = {
@@ -55,7 +68,7 @@ export const ChatContextProvider = ({ children }) => {
             id: id || null,
             model: model || null,
         };
-        updateChatContext(updatedState);
+        await updateChatContext(updatedState);
 
         const updatedApiContext = [
             ...apiContextRef.current,
@@ -64,29 +77,27 @@ export const ChatContextProvider = ({ children }) => {
         updateApiContext(updatedApiContext);
     };
 
-    const clearMessages = () => {
+    const clearMessages = async () => {
         setMsgCount(0);
-        setSessionId(null);
+        setSessionId(Date.now().toString()); // Generate a new session ID
         setMessages([]);
         updateChatContext([]);
         updateApiContext([]);
     };
 
-    const replaceSession = (session) => {
-        clearMessages();
+    const replaceSession = async (session) => {
+        await clearMessages();
         setSessionId(session.session_id);
         setMessages(session.queries);
         setMsgCount(session.queries.length);
+        updateChatContext(session.queries);
     };
 
     const callAjax = (payload, callback) => {
-        // Add user message to the contexts
         addMessage({ role: 'user', content: payload.content });
 
-        // Calculate the index for the new message
-        const userMessageIndex = chatContextRef.current.length - 1; // This is important!
+        const userMessageIndex = chatContextRef.current.length - 1;
 
-        // Use the updated apiContext for the call
         const wrappedPayload = [...apiContextRef.current];
         console.log("calling callAI with ", wrappedPayload);
 
@@ -103,8 +114,18 @@ export const ChatContextProvider = ({ children }) => {
         });
     };
 
+    const updateVote = async (index, vote) => {
+        const updatedState = [...chatContextRef.current];
+        updatedState[index] = {
+            ...updatedState[index],
+            rating: vote
+        };
+        await updateChatContext(updatedState);
+        console.log("Updated chatContext after vote:", updatedState);
+    };
+
     return (
-        <ChatContext.Provider value={{ messages, addMessage, clearMessages, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext }}>
+        <ChatContext.Provider value={{ messages, addMessage, clearMessages, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote }}>
             {children}
         </ChatContext.Provider>
     );

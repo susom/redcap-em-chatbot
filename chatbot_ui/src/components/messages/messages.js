@@ -1,4 +1,4 @@
-import React, { useContext, useRef, useEffect, useState } from "react";
+import React, { useContext, useRef, useEffect } from "react";
 import { Overlay, Popover } from 'react-bootstrap';
 import { HandThumbsUp, HandThumbsDown, HandThumbsUpFill, HandThumbsDownFill } from 'react-bootstrap-icons';
 import { ChatContext } from "../../contexts/Chat";
@@ -9,11 +9,7 @@ export const Messages = () => {
     const newQaRef = useRef(null);
 
     const handleClick = (vote, index) => {
-        const updatedChatContext = [...chat_context.chatContext];
-        updatedChatContext[index].rating = vote;
-        chat_context.updateChatContext(updatedChatContext);
-
-        console.log("Updated chatContext after rating:", updatedChatContext);
+        chat_context.updateVote(index, vote);
     };
 
     const getVotesElement = () => {
