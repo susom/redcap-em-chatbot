@@ -8,13 +8,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     use emLoggerTrait;
     const BUILD_FILE_DIR = 'chatbot_ui/build/static/';
 
-    protected $secureChatInstance;
+    private \Stanford\SecureChatAI\SecureChatAI $secureChatInstance;
 
     public function __construct() {
         parent::__construct();
-        $moduleDirectoryPrefix = "wtf";
-        $this->secureChatInstance = \ExternalModules\ExternalModules::getModuleInstance($moduleDirectoryPrefix);
     }
+
+
 
     public function redcap_every_page_top($project_id) {
         try {
@@ -115,7 +115,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     public function formatResponse($response) {
-        $content = $this->secureChatInstance->extractResponseText($response);
+        $content = $this->getSecureChatInstance()->extractResponseText($response);
         $role = $response['choices'][0]['message']['role'] ?? 'assistant';
         $id = $response['id'] ?? null;
         $model = $response['model'] ?? null;
@@ -139,9 +139,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         switch ($action) {
             case "callAI":
                 $messages = $this->sanitizeInput($payload);
-                $this->emDebug("hey payload wtf", $payload, $messages);
+                $this->emDebug("hey payload secure_chat_ai", $payload, $messages);
 
-                $response = $this->secureChatInstance->callAI($messages);
+                $response = $this->getSecureChatInstance()->callAI($messages);
                 $result = $this->formatResponse($response);
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
                 return json_encode($result);
@@ -222,5 +222,34 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
         return $dot_product / ($magnitude1 * $magnitude2);
     }
+
+    /**
+     * @return \Stanford\SecureChatAI\SecureChatAI
+     * @throws \Exception
+     */
+    public function getSecureChatInstance(): \Stanford\SecureChatAI\SecureChatAI
+    {
+
+        if(empty($this->secureChatInstance) and $this->getSystemSetting('secure_chat_ai') !== ''){
+            $this->setSecureChatInstance(\ExternalModules\ExternalModules::getModuleInstance($this->getSystemSetting('secure_chat_ai')));
+            return $this->secureChatInstance;
+        }
+        elseif(empty($this->secureChatInstance)){
+            throw new \Exception("SecureChatAI instance not set");
+
+        }else{
+            return $this->secureChatInstance;
+        }
+    }
+
+    /**
+     * @param \Stanford\SecureChatAI\SecureChatAI $secureChatInstance
+     */
+    public function setSecureChatInstance(\Stanford\SecureChatAI\SecureChatAI $secureChatInstance): void
+    {
+        $this->secureChatInstance = $secureChatInstance;
+    }
+
+
 }
 ?>
