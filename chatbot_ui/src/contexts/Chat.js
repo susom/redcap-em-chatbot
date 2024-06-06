@@ -20,7 +20,7 @@ export const ChatContextProvider = ({ children }) => {
     };
 
     const saveChatContext = async () => {
-        if (sessionId) {
+        if (sessionId && chatContextRef.current.length > 0) {
             const currentSession = await getSession(sessionId);
             if (currentSession) {
                 await updateSession(sessionId, chatContextRef.current);
@@ -30,11 +30,13 @@ export const ChatContextProvider = ({ children }) => {
         }
     };
 
-    const updateChatContext = async (newContext) => {
+    const updateChatContext = async (newContext, shouldSave = true) => {
         chatContextRef.current = newContext;
         setChatContext(newContext);
         console.log("Updated chatContext:", newContext);
-        await saveChatContext(); // Save chat session after each update
+        if (shouldSave) {
+            await saveChatContext(); // Save chat session after each update
+        }
     };
 
     const addMessage = (message) => {
@@ -78,19 +80,22 @@ export const ChatContextProvider = ({ children }) => {
     };
 
     const clearMessages = async () => {
+        const newSessionId = Date.now().toString(); // Generate a new session ID
         setMsgCount(0);
-        setSessionId(Date.now().toString()); // Generate a new session ID
         setMessages([]);
-        updateChatContext([]);
-        updateApiContext([]);
+        setSessionId(newSessionId);
+        // Clear chatContext and apiContext without saving
+        chatContextRef.current = [];
+        apiContextRef.current = [];
+        setChatContext([]);
+        setApiContext([]);
     };
 
     const replaceSession = async (session) => {
-        await clearMessages();
         setSessionId(session.session_id);
         setMessages(session.queries);
         setMsgCount(session.queries.length);
-        updateChatContext(session.queries);
+        updateChatContext(session.queries, false);
     };
 
     const callAjax = (payload, callback) => {
