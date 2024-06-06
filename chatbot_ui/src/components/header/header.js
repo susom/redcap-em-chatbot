@@ -6,7 +6,8 @@ import "./header.css";
 function Header({ changeView }) {
     return (
         <Container className="rcchat_header">
-            <h1 onClick={() => changeView('splash')}>
+            <h1>
+                <span className="logo" onClick={() => changeView('splash')}></span>
                 REDCapBot Support
                 <button onClick={() => changeView('history')} className="archive">
                     <Archive size={20}/>

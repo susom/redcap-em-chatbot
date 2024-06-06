@@ -1,31 +1,39 @@
-
-.rcchat_header{
-    text-align: left;
+.rcchat_header {
+    position: relative;
 }
 
 .rcchat_header h1 {
-    background:url("../../assets/images/redcap_logo.png") 0 50% no-repeat;
-    background-size: 30px;
     font-size: 122%;
     margin: 15px 0;
-    padding-left: 40px;
     height: 30px;
-    line-height: 160%;
+    line-height: 30px;
     color: #fff;
+    position: relative;
+}
+
+.rcchat_header .logo {
+    background: url("../../assets/images/redcap_logo.png") 0 50% no-repeat;
+    background-size: 30px;
+    display: inline-block;
+    width: 29px;
+    height: 29px;
     cursor: pointer;
+    margin-right: 6px;
+    vertical-align: bottom;
+    border-radius:30px;
 }
 
 .rcchat_header button {
-    border:none;
-    background:none;
-    color:#fff;
+    border: none;
+    background: none;
+    color: #fff;
 }
 
 .rcchat_header .archive {
-    float:right;
-    margin-left:5px;
+    float: right;
+    margin-left: 5px;
 }
 
 .rcchat_header .chat {
-    float:right;
+    float: right;
 }
