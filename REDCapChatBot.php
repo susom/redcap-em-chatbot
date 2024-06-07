@@ -10,6 +10,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     private \Stanford\SecureChatAI\SecureChatAI $secureChatInstance;
 
+    const SecureChatInstanceModuleName = 'SecureChatAI';
+
     public function __construct() {
         parent::__construct();
     }
@@ -142,7 +144,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $this->emDebug("hey payload secure_chat_ai", $payload, $messages);
 
                 $response = $this->getSecureChatInstance()->callAI($messages);
+                $this->emDebug("after getSecureChatInstance");
+
                 $result = $this->formatResponse($response);
+
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
                 return json_encode($result);
 
@@ -230,13 +235,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     public function getSecureChatInstance(): \Stanford\SecureChatAI\SecureChatAI
     {
 
-        if(empty($this->secureChatInstance) and $this->getSystemSetting('secure_chat_ai') !== ''){
-            $this->setSecureChatInstance(\ExternalModules\ExternalModules::getModuleInstance($this->getSystemSetting('secure_chat_ai')));
+        if(empty($this->secureChatInstance)){
+            $this->setSecureChatInstance(\ExternalModules\ExternalModules::getModuleInstance(self::SecureChatInstanceModuleName));
             return $this->secureChatInstance;
-        }
-        elseif(empty($this->secureChatInstance)){
-            throw new \Exception("SecureChatAI instance not set");
-
         }else{
             return $this->secureChatInstance;
         }
