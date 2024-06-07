@@ -37,10 +37,6 @@
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Adding shadow for depth */
 }
 
-.draggable-container:hover {
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3); /* Stronger shadow on hover */
-}
-
 .handle {
     cursor: move; /* Indicate draggable area */
 }
