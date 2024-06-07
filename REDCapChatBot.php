@@ -10,6 +10,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     private \Stanford\SecureChatAI\SecureChatAI $secureChatInstance;
 
+    //This should be "SecureChatAI in prod... but maybe different in local depending on what directory name you cloned it into"
     const SecureChatInstanceModuleName = 'SecureChatAI';
 
     public function __construct() {
