@@ -13,6 +13,7 @@
     bottom: 20px; /* Initial position */
     right: 20px; /* Initial position */
     pointer-events: auto; /* Make this element interactive */
+    transition: box-shadow 0.2s ease-in-out; /* Smooth transition for shadow */
 }
 
 .draggable-container.splash {
@@ -33,6 +34,11 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Adding shadow for depth */
+}
+
+.draggable-container:hover {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3); /* Stronger shadow on hover */
 }
 
 .handle {

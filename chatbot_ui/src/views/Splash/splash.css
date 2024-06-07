@@ -8,5 +8,7 @@
     background-size: cover;
     cursor: pointer;
     z-index: 10000; /* Ensure it's above other elements */
-    border: none; /* Remove border */
+    border: 2px solid #FF5733; /* Thicker border */
+    border-radius: 30px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Adding shadow for depth */
 }
