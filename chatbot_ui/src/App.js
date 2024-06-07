@@ -4,27 +4,37 @@ import Footer from './components/footer/footer';
 import Splash from './views/Splash';
 import Home from './views/Home';
 import History from './views/History';
-
+import Draggable from 'react-draggable';
 import './App.css';
 import './assets/styles/global.css';
 
 function App() {
-    // Start with 'splash' as the initial view
     const [currentView, setCurrentView] = useState('splash');
+    const [defaultPosition, setDefaultPosition] = useState({ x: 0, y: 0 });
 
     // Function to change view
     const changeView = (viewName) => {
+        if (viewName === 'splash') {
+            // Reset the position to bottom right
+            setDefaultPosition({ x: 0, y: 0 });
+        }
         setCurrentView(viewName);
     };
 
-    // Determine which component to render based on the current view
+    // Adjust the initial position of the draggable container
+    useEffect(() => {
+        if (currentView === 'splash') {
+            setDefaultPosition({ x: 0, y: 0 });
+        }
+    }, [currentView]);
+
     let ViewComponent;
     switch (currentView) {
         case 'home':
-            ViewComponent = <Home changeView={changeView}/>;
+            ViewComponent = <Home changeView={changeView} />;
             break;
         case 'history':
-            ViewComponent = <History changeView={changeView}/>;
+            ViewComponent = <History changeView={changeView} />;
             break;
         case 'splash':
         default:
@@ -33,10 +43,19 @@ function App() {
     }
 
     return (
-        <div>
-            {currentView !== 'splash' && <Header changeView={changeView}/>}
-            {ViewComponent}
-            {currentView !== 'splash' && <Footer changeView={changeView}/>}
+        <div id="chatbot_ui_container">
+            <Draggable handle=".handle" position={defaultPosition} onStop={(e, data) => setDefaultPosition({ x: data.x, y: data.y })}>
+                <div className={`draggable-container ${currentView}`}>
+                    {currentView !== 'splash' && (
+                        <>
+                            <Header changeView={changeView} />
+                            {ViewComponent}
+                            <Footer changeView={changeView} />
+                        </>
+                    )}
+                    {currentView === 'splash' && ViewComponent}
+                </div>
+            </Draggable>
         </div>
     );
 }

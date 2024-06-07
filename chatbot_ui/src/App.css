@@ -1,12 +1,42 @@
 #chatbot_ui_container {
-    position: fixed; /* Stick to the viewport */
-    bottom: 20px; /* Distance from the bottom */
-    right: 20px; /* Distance from the right */
-    border-radius:10px;
-    border:1px solid #999;
-    z-index:9999;
-    overflow: hidden; /* To manage overflow */
+    position: fixed; /* Cover the entire viewport */
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    pointer-events: none; /* Allow clicks to pass through */
+}
+
+.draggable-container {
+    position: absolute;
+    bottom: 20px; /* Initial position */
+    right: 20px; /* Initial position */
+    pointer-events: auto; /* Make this element interactive */
+}
+
+.draggable-container.splash {
+    width: 100px; /* Size of the splash icon */
+    height: 100px;
+    background: none;
+    border: none;
+}
+
+.draggable-container.home,
+.draggable-container.history {
+    width: 390px; /* Full UI size */
     background: #2C2C2C; /* Assuming you want the same background */
+    border-radius: 10px;
+    border: 1px solid #999;
+    max-height: 80vh; /* Adjust this as necessary */
+    min-height: 25vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.handle {
+    cursor: move; /* Indicate draggable area */
 }
 
 .App {
@@ -15,16 +45,16 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+    .App-logo {
+        animation: App-logo-spin infinite 20s linear;
+    }
 }
 
 @keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }

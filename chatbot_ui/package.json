@@ -15,6 +15,7 @@
     "react-confirm-alert": "^3.0.6",
     "react-detect-offline": "^2.4.5",
     "react-dom": "^18.3.1",
+    "react-draggable": "^4.4.6",
     "react-markdown": "^9.0.1",
     "react-router-dom": "^6.23.1",
     "react-scripts": "^5.0.1",
