@@ -144,9 +144,17 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $messages = $this->sanitizeInput($payload);
                 $this->emDebug("hey payload secure_chat_ai", $payload, $messages);
 
-                $response = $this->getSecureChatInstance()->callAI($messages);
-                $this->emDebug("after getSecureChatInstance");
 
+                /*
+                 *  THIS IS WHERE THE RAG GOES.
+                 *  WE WOULD USE $this->generateEmbeddings($messages);
+                 *  THEN QUERY OUR CONTEXT DB
+                 *  IF MATCH FOUND WE INJECT IT INTO {role:"system", "content \n like so \n new content here"}
+                 *  and save it back to $messages to pass on.
+                */
+
+
+                $response = $this->getSecureChatInstance()->callAI($messages);
                 $result = $this->formatResponse($response);
 
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
