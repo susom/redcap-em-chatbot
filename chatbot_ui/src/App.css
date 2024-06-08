@@ -10,10 +10,12 @@
 
 .draggable-container {
     position: absolute;
-    bottom: 20px; /* Initial position */
-    right: 20px; /* Initial position */
+    bottom: 30px; /* Initial position */
+    right: 30px; /* Initial position */
     pointer-events: auto; /* Make this element interactive */
     transition: box-shadow 0.2s ease-in-out; /* Smooth transition for shadow */
+    display: flex;
+    flex-direction: column;
 }
 
 .draggable-container.splash {
@@ -25,13 +27,10 @@
 
 .draggable-container.home,
 .draggable-container.history {
-    width: 390px; /* Full UI size */
     background: #2C2C2C; /* Assuming you want the same background */
     border-radius: 10px;
     border: 1px solid #999;
     max-height: 80vh; /* Adjust this as necessary */
-    min-height: 25vh;
-    overflow-y: auto;
     display: flex;
     flex-direction: column;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Adding shadow for depth */
@@ -45,6 +44,58 @@
     width: auto; /* Make .App fill the container */
     height: auto; /* Adjust height as necessary, or make it auto based on content */
 }
+
+.content {
+    flex: 1;
+    overflow: hidden; /* Prevent overflow from the content */
+    display: flex;
+    flex-direction: column;
+    height: calc(98% - 60px); /* Account for the footer height */
+}
+
+.body {
+    flex: 1;
+    overflow-y: auto; /* Allow vertical scrolling */
+}
+
+.messages {
+    height: 100%; /* Full height for messages */
+    overflow-y: scroll;
+    padding-bottom: 50px;
+}
+
+.react-resizable {
+    transition: width 0.3s ease, height 0.3s ease; /* Adjust the duration and easing as needed */
+}
+
+.react-resizable-box {
+    position: relative;
+}
+
+.react-resizable-handle {
+    width: 20px;
+    height: 20px;
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    cursor: nwse-resize;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(200, 200, 200, 0.5); /* Lighter, more subtle gray */
+    border-radius: 10px 0 10px 0; /* Match the rounded corner */
+}
+
+.react-resizable-handle::before {
+    content: "\f0c9"; /* Font Awesome icon for 'bars' */
+    font-family: "Font Awesome 5 Free";
+    font-weight: 900;
+    font-size: 12px;
+    color: #777;
+    transform: translate(2px, 2px); /* Adjust position */
+}
+
 
 @media (prefers-reduced-motion: no-preference) {
     .App-logo {

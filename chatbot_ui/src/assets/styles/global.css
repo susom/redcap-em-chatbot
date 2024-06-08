@@ -1,13 +1,7 @@
 
 .body {
-    width: 390px; /* Define width, adjust as needed */
     /*box-shadow: 1px 1px 2px 2px #ccc;*/
     background: #2C2C2C; /* Assuming you want the same background */
-
-    height:100vh;
-    max-height:50vh;
-    min-height:25vh;
-    overflow-y: auto;
 }
 
 .history {

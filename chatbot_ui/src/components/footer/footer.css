@@ -1,12 +1,18 @@
-
 .footer {
-    background:#fff;
+    background: #fff;
     border-radius: 0 0 10px 10px;
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
 }
 
 .footer button {
-    background:none;
-    border:none;
+    background: none;
+    border: none;
 }
 
 .footer .user_input {
@@ -16,31 +22,30 @@
 }
 
 .footer .user_input:focus {
-  outline: none;
+    outline: none;
 }
 
-
-.footer button .sendfill.rotate{
-    display:initial;
+.footer button .sendfill.rotate {
+    display: initial;
     animation: rotate 2s linear infinite;
 }
 
-.footer button.clear_chat{
-  padding-left:0;
-  margin-right: 5px;
-  border-right: 1px dotted #ccc;
+.footer button.clear_chat {
+    padding-left: 0;
+    margin-right: 5px;
+    border-right: 1px dotted #ccc;
 }
 
 .footer button .sendfill,
-.footer button .send.off{
-    display:none;
+.footer button .send.off {
+    display: none;
 }
 
 @keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
