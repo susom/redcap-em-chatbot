@@ -13,11 +13,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     //This should be "SecureChatAI in prod... but maybe different in local depending on what directory name you cloned it into"
     const SecureChatInstanceModuleName = 'SecureChatAI';
 
+    private $system_context;
+
     public function __construct() {
         parent::__construct();
+
+        $this->system_context = $this->getSystemSetting('chatbot_system_context');
     }
-
-
 
     public function redcap_every_page_top($project_id) {
         try {
@@ -35,6 +37,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         $cmds = [
             "window.chatbot_jsmo_module = " . $this->getJavascriptModuleObjectName()
         ];
+
+        $initial_system_context = $this->appendSystemContext(array(), $this->system_context);
+        $data = !empty($initial_system_context) ? $initial_system_context : null;
+        $this->emDebug($data);
         if (!empty($data)) $cmds[] = "window.chatbot_jsmo_module.data = " . json_encode($data);
         if (!empty($init_method)) $cmds[] = "window.chatbot_jsmo_module.afterRender(chatbot_jsmo_module." . $init_method . ")";
         ?>
@@ -137,6 +143,24 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $formattedResponse;
     }
 
+    public function appendSystemContext($chatMlArray, $newContext)
+    {
+        $hasSystemContext = false;
+        for($i=0; $i<count($chatMlArray) ; $i++) {
+            if($chatMlArray[$i]['role'] == 'system'){
+                $chatMlArray[$i]['content'] .='\n '.$newContext;
+                $hasSystemContext =true;
+                break;
+            }
+        }
+
+        if(!$hasSystemContext){
+            array_unshift($chatMlArray, array("role" => "system", "content" => $newContext));
+        }
+
+        return $chatMlArray;
+    }
+
     public function redcap_module_ajax($action, $payload, $project_id, $record, $instrument, $event_id, $repeat_instance,
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
         switch ($action) {
@@ -151,8 +175,11 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                  *  THEN QUERY OUR CONTEXT DB
                  *  IF MATCH FOUND WE INJECT IT INTO {role:"system", "content \n like so \n new content here"}
                  *  and save it back to $messages to pass on.
-                */
+                 *
 
+                */
+                //if find matching RAG then append it to system content
+                // $messages = appendSystemContext($messages, $ragContext);
 
                 $response = $this->getSecureChatInstance()->callAI($messages);
                 $result = $this->formatResponse($response);
