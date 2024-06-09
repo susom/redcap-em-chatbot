@@ -3,7 +3,11 @@
 
     Object.assign(module, {
         InitFunction: function () {
-            console.log("Calling this InitFunction() after load...");
+            console.log("Calling this InitFunction() after load...", window.chatbot_jsmo_module.data);
+        },
+
+        getInitialSystemContext: function() {
+          return  window.chatbot_jsmo_module.data;
         },
 
         callAI: async (payload, callback, errorCallback) => {

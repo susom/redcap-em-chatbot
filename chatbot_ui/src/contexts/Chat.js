@@ -14,6 +14,10 @@ export const ChatContextProvider = ({ children }) => {
     const apiContextRef = useRef(apiContext);
     const chatContextRef = useRef(chatContext);
 
+    useEffect(() => {
+        console.log("apiContext updated: ", apiContext);
+    }, [apiContext]);
+
     const updateApiContext = (newContext) => {
         apiContextRef.current = newContext;
         setApiContext(newContext);
@@ -46,6 +50,10 @@ export const ChatContextProvider = ({ children }) => {
             { role: message.role, content: message.content, index },
         ];
         updateApiContext(updatedApiContext);
+
+        if(message.role == "system"){
+            return;
+        }
 
         const newChatContext = [
             ...chatContextRef.current,
@@ -100,10 +108,15 @@ export const ChatContextProvider = ({ children }) => {
     };
 
     const callAjax = (payload, callback) => {
+        if(apiContextRef.current.length === 0){
+            const initial_system_context = window.chatbot_jsmo_module.getInitialSystemContext().pop();
+            console.log("initial apiContext, if empty , inject system context before first query", initial_system_context);
+            addMessage(initial_system_context);
+        }
+
         addMessage({ role: 'user', content: payload.content });
 
         const userMessageIndex = chatContextRef.current.length - 1;
-
         const wrappedPayload = [...apiContextRef.current];
         console.log("calling callAI with ", wrappedPayload);
 

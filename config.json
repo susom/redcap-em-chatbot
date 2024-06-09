@@ -60,12 +60,13 @@
 
 
 	"system-settings": [
-		{
-			"key": "secure_chat_ai",
-			"name": "Set the Secure Chat AI instance",
-			"required": true,
-			"type": "text"
-		},{
+        {
+            "key": "chatbot_system_context",
+            "name": "Raw text to inject into system context",
+            "required": true,
+            "type": "textarea"
+        },
+        {
 			"key": "enable-system-debug-logging",
 			"name": "<b>Enable Debug Logging (system-wide)</b><i>(optional)</i> Requires installation and configuration of emLogger",
 			"required": false,
