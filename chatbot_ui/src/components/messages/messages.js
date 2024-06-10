@@ -78,7 +78,7 @@ export const Messages = () => {
                             </React.Fragment>
                         ))
                     )
-                    : (<p className={`empty`}><em className={`soft_text`}>Ask me anything!</em></p>)
+                    : (<p className={`empty`}><em className={`soft_text`}>Hi I am Cappy! Your REDCap Support buddy.  How can I assist you today?</em></p>)
             }
         </div>
     );

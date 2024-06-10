@@ -4,8 +4,7 @@
 }
 
 .messages .empty {
-    padding: 10px 0;
-    color: #9DA5B1;
+    color: cyan;
 }
 
 .messages dl {
