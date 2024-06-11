@@ -1,45 +1,41 @@
 {
-	"name": "REDCapChatBot",
+    "name": "REDCapChatBot",
 
-	"namespace": "Stanford\\REDCapChatBot",
+    "namespace": "Stanford\\REDCapChatBot",
 
-	"description": "An EM intended for system wide distribution to inject frontend Support Chat Bot code",
+    "description": "An EM intended for system wide distribution to inject frontend Support Chat Bot code",
 
-	"documentation": "README.md",
+    "documentation": "README.md",
 
-	"authors": [
-		{
-			"name": "Andrew Martin",
-			"email": "andy123@stanford.edu",
-			"institution": "Stanford University"
-		},
+    "authors": [
         {
             "name": "Irvin Szeto",
             "email": "irvins@stanford.edu",
             "institution": "Stanford University"
         }
-	],
+    ],
 
     "framework-version": 9,
 
-	"permissions": [
-        "redcap_every_page_top"
-	],
+    "permissions": [
+        "redcap_every_page_top",
+        "redcap_module_system_enable"
+    ],
 
-	"enable-every-page-hooks-on-system-pages": true,
+    "enable-every-page-hooks-on-system-pages": true,
 
-	"links": {
-		"project": [
+    "links": {
+        "project": [
 
-		],
-		"control-center": [
+        ],
+        "control-center": [
 
-		]
-	},
+        ]
+    },
 
-	"no-auth-pages": [
+    "no-auth-pages": [
 
-	],
+    ],
 
     "auth-ajax-actions": [
         "callAI"
@@ -49,17 +45,16 @@
         "callAI"
     ],
 
-	"project-settings": [
-		{
-			"key": "enable-project-debug-logging",
-			"name": "<b>Enable Debug Logging</b><br><i>(optional)</i> Requires installation and configuration of emLogger",
-			"required": false,
-			"type": "checkbox"
-		}
-	],
+    "project-settings": [
+        {
+            "key": "enable-project-debug-logging",
+            "name": "<b>Enable Debug Logging</b><br><i>(optional)</i> Requires installation and configuration of emLogger",
+            "required": false,
+            "type": "checkbox"
+        }
+    ],
 
-
-	"system-settings": [
+    "system-settings": [
         {
             "key": "chatbot_system_context",
             "name": "Raw text to inject into system context",
@@ -67,17 +62,38 @@
             "type": "textarea"
         },
         {
-			"key": "enable-system-debug-logging",
-			"name": "<b>Enable Debug Logging (system-wide)</b><i>(optional)</i> Requires installation and configuration of emLogger",
-			"required": false,
-			"type": "checkbox"
-		}
-	],
+            "key": "enable-system-debug-logging",
+            "name": "<b>Enable Debug Logging (system-wide)</b><i>(optional)</i> Requires installation and configuration of emLogger",
+            "required": false,
+            "type": "checkbox"
+        }
+    ],
 
-	"compatibility": {
-		"php-version-min": "",
-		"php-version-max": "",
-		"redcap-version-min": "",
-		"redcap-version-max": ""
-	}
+    "compatibility": {
+        "php-version-min": "",
+        "php-version-max": "",
+        "redcap-version-min": "",
+        "redcap-version-max": ""
+    },
+
+    "entities": {
+        "chatbot_contextdb": {
+            "label": "Context DB for Chatbot",
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "label": "Title"
+                },
+                "raw_content": {
+                    "type": "string",
+                    "label": "Raw Content"
+                },
+                "tfidf_vector": {
+                    "type": "string",
+                    "label": "TF-IDF Vector"
+                }
+            }
+        }
+    }
 }

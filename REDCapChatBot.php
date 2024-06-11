@@ -1,7 +1,15 @@
 <?php
 namespace Stanford\REDCapChatBot;
 
+require 'vendor/autoload.php';
 require_once "emLoggerTrait.php";
+
+use Phpml\FeatureExtraction\TfIdfTransformer;
+use Phpml\Tokenization\WhitespaceTokenizer;
+use \REDCapEntity\Entity;
+use \REDCapEntity\EntityDB;
+use REDCapEntity\EntityFactory;
+
 
 class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
@@ -10,15 +18,52 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     private \Stanford\SecureChatAI\SecureChatAI $secureChatInstance;
 
-    //This should be "SecureChatAI in prod... but maybe different in local depending on what directory name you cloned it into"
     const SecureChatInstanceModuleName = 'SecureChatAI';
 
     private $system_context;
+    private $tfIdfTransformer;
+    private $tokenizer;
 
     public function __construct() {
         parent::__construct();
-
         $this->system_context = $this->getSystemSetting('chatbot_system_context');
+        $this->tfIdfTransformer = new TfIdfTransformer();
+        $this->tokenizer = new WhitespaceTokenizer();
+    }
+
+    // Define entity types
+    public function redcap_entity_types() {
+        $types = [];
+
+        $types['chatbot_contextdb'] = [
+            'label' => 'Chatbot Context',
+            'label_plural' => 'Chatbot Contexts',
+            'icon' => 'file',
+            'properties' => [
+                'title' => [
+                    'name' => 'Title',
+                    'type' => 'text',
+                    'required' => true,
+                ],
+                'raw_content' => [
+                    'name' => 'Raw Content',
+                    'type' => 'long_text',
+                    'required' => true,
+                ],
+                'tfidf_vector' => [
+                    'name' => 'TF-IDF Vector',
+                    'type' => 'long_text',
+                    'required' => true,
+                ],
+            ],
+        ];
+
+        return $types;
+    }
+
+    // Hook to trigger entity initialization on module enablement
+    public function redcap_module_system_enable($version) {
+        \REDCapEntity\EntityDB::buildSchema($this->PREFIX);
     }
 
     public function redcap_every_page_top($project_id) {
@@ -40,7 +85,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
         $initial_system_context = $this->appendSystemContext(array(), $this->system_context);
         $data = !empty($initial_system_context) ? $initial_system_context : null;
-        $this->emDebug($data);
         if (!empty($data)) $cmds[] = "window.chatbot_jsmo_module.data = " . json_encode($data);
         if (!empty($init_method)) $cmds[] = "window.chatbot_jsmo_module.afterRender(chatbot_jsmo_module." . $init_method . ")";
         ?>
@@ -53,14 +97,11 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     public function injectIntegrationUI() {
         $this->injectJSMO(null);
-
         $build_files = $this->generateAssetFiles();
-
         foreach ($build_files as $file) {
             echo $file;
         }
         echo '<div id="chatbot_ui_container"></div>';
-
         $this->emdebug("injectIntegrationUI() End");
     }
 
@@ -84,7 +125,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 }
 
                 $url = $this->getUrl(self::BUILD_FILE_DIR . '/' . $folder . '/' . $file);
-
                 $html = '';
                 if (str_contains($file, '.js')) {
                     $html = "<script type='module' crossorigin src='{$url}'></script>";
@@ -143,18 +183,17 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $formattedResponse;
     }
 
-    public function appendSystemContext($chatMlArray, $newContext)
-    {
+    public function appendSystemContext($chatMlArray, $newContext) {
         $hasSystemContext = false;
-        for($i=0; $i<count($chatMlArray) ; $i++) {
-            if($chatMlArray[$i]['role'] == 'system'){
-                $chatMlArray[$i]['content'] .='\n '.$newContext;
-                $hasSystemContext =true;
+        for ($i = 0; $i < count($chatMlArray); $i++) {
+            if ($chatMlArray[$i]['role'] == 'system') {
+                $chatMlArray[$i]['content'] .= '\n\n ' . $newContext;
+                $hasSystemContext = true;
                 break;
             }
         }
 
-        if(!$hasSystemContext){
+        if (!$hasSystemContext) {
             array_unshift($chatMlArray, array("role" => "system", "content" => $newContext));
         }
 
@@ -166,21 +205,15 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         switch ($action) {
             case "callAI":
                 $messages = $this->sanitizeInput($payload);
-                $this->emDebug("hey payload secure_chat_ai", $payload, $messages);
 
+                //FIND AND INJECT RAG
+                $relevantDocs = $this->getRelevantDocuments($messages);
+                if (!empty($relevantDocs)) {
+                    $ragContext = implode("\n\n", array_column($relevantDocs, 'raw_content'));
+                    $messages = $this->appendSystemContext($messages, $ragContext);
+                }
 
-                /*
-                 *  THIS IS WHERE THE RAG GOES.
-                 *  WE WOULD USE $this->generateEmbeddings($messages);
-                 *  THEN QUERY OUR CONTEXT DB
-                 *  IF MATCH FOUND WE INJECT IT INTO {role:"system", "content \n like so \n new content here"}
-                 *  and save it back to $messages to pass on.
-                 *
-
-                */
-                //if find matching RAG then append it to system content
-                // $messages = appendSystemContext($messages, $ragContext);
-
+                //CALL API ENDPOINT WITH AUGMENTED CHATML
                 $response = $this->getSecureChatInstance()->callAI($messages);
                 $result = $this->formatResponse($response);
 
@@ -192,77 +225,197 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         }
     }
 
-    /**
-     * Store document embedding
-     * @param string $title
-     * @param string $content
-     * @return void
-     */
-    public function storeDocumentEmbedding($title, $content) {
-        $embedding = $this->generateEmbedding($content); // Generate embedding for the content
-        $serialized_embedding = serialize($embedding); // Serialize the embedding
-
-        $sql = "INSERT INTO document_embeddings (title, raw_content, embedding) VALUES (?, ?, ?)";
-        $params = [$title, $content, $serialized_embedding];
-        $this->query($sql, $params);
+    private function tokenize($text) {
+        return $this->tokenizer->tokenize($text);
     }
 
-    /**
-     * Generate embedding for a given text
-     * @param string $text
-     * @return array
-     */
-    private function generateEmbedding($text) {
-        // Placeholder for embedding generation logic using a pre-trained model
-        return [];
+    private function calculateIDF($allDocuments) {
+        $idf = [];
+        $totalDocuments = count($allDocuments);
+
+        foreach ($allDocuments as $tokens) {
+            foreach (array_unique($tokens) as $word) {
+                if (!isset($idf[$word])) {
+                    $idf[$word] = 0;
+                }
+                $idf[$word]++;
+            }
+        }
+
+        foreach ($idf as $word => $count) {
+            $idf[$word] = log($totalDocuments / $count);
+        }
+
+        return $idf;
     }
 
-    /**
-     * Retrieve relevant documents based on query
-     * @param string $query
-     * @return array
-     */
-    public function getRelevantDocuments($query) {
-        $query_embedding = $this->generateEmbedding($query); // Generate embedding for the query
+    private function calculateTFIDF($tokens, $idf) {
+        // Step 1: Calculate Term Frequency (TF)
+        $tf = array_count_values($tokens);
+        $totalTokens = count($tokens);
+        foreach ($tf as $word => $count) {
+            $tf[$word] = $count / $totalTokens;
+        }
 
-        $sql = "SELECT id, title, raw_content, embedding FROM document_embeddings";
-        $result = $this->query($sql, []);
+        // Step 2: Calculate TF-IDF
+        $tfidf = [];
+        foreach ($tf as $word => $value) {
+            $tfidf[$word] = $value * ($idf[$word] ?? 0);
+        }
+
+        return $tfidf;
+    }
+
+    private function getAllEntityIds($entityType) {
+        $ids = [];
+        $sql = 'SELECT id FROM `redcap_entity_' . db_escape($entityType) . '`';
+        $result = db_query($sql);
+
+        while ($row = db_fetch_assoc($result)) {
+            $ids[] = $row['id'];
+        }
+
+        return $ids;
+    }
+
+    // Retrieve relevant documents method
+    public function getRelevantDocuments($queryArray) {
+        if (!is_array($queryArray) || empty($queryArray)) {
+            return null;
+        }
+
+        $lastElement = end($queryArray);
+
+        if (!isset($lastElement['role']) || $lastElement['role'] !== 'user' || !isset($lastElement['content'])) {
+            return null;
+        }
+
+        $query = $lastElement['content'];
+        $queryTokens = $this->tokenize($query);
+
+        try {
+            // Check if the EntityFactory class is accessible
+            if (!class_exists('REDCapEntity\EntityFactory')) {
+                $this->emError("REDCapEntity\EntityFactory class does not exist.");
+                return null;
+            }
+
+            // Instantiate EntityFactory
+            $entityFactory = new EntityFactory();
+
+            // Retrieve all entity IDs for IDF calculation
+            $ids = $this->getAllEntityIds('chatbot_contextdb');
+
+            // Retrieve all documents for IDF calculation using IDs
+            $entities = $entityFactory->loadInstances('chatbot_contextdb', $ids);
+        } catch (Exception $e) {
+            $this->emError("Error retrieving entities: " . $e->getMessage());
+            return null;
+        } catch (Throwable $e) {
+            $this->emError("Error retrieving entities (Throwable): " . $e->getMessage());
+            return null;
+        }
+
+        if (empty($entities)) {
+            return null;
+        }
+
+        $allDocuments = [];
+        foreach ($entities as $entity) {
+            $docTokens = json_decode($entity->getData()['tfidf_vector'], true);
+            $allDocuments[] = $docTokens;
+        }
+
+        // Calculate IDF values
+        $idf = $this->calculateIDF($allDocuments);
+
+        // Calculate TF-IDF for the query
+        $queryTFIDF = $this->calculateTFIDF($queryTokens, $idf);
 
         $documents = [];
-        while ($row = db_fetch_assoc($result)) {
-            $document_embedding = unserialize($row['embedding']); // Deserialize the embedding
-            $similarity = $this->cosineSimilarity($query_embedding, $document_embedding); // Calculate cosine similarity
+        foreach ($entities as $entity) {
+            $docTokens = json_decode($entity->getData()['tfidf_vector'], true);
+            $similarity = $this->cosineSimilarity($queryTFIDF, $docTokens);
 
             $documents[] = [
-                'id' => $row['id'],
-                'title' => $row['title'],
-                'raw_content' => $row['raw_content'],
+                'id' => $entity->getId(),
+                'title' => $entity->getData()['title'],
+                'raw_content' => $entity->getData()['raw_content'],
                 'similarity' => $similarity
             ];
         }
 
-        // Sort documents by similarity
         usort($documents, function($a, $b) {
             return $b['similarity'] <=> $a['similarity'];
         });
 
-        // Return top N documents
-        return array_slice($documents, 0, 5);
+        return array_slice($documents, 0, 3);
     }
 
-    /**
-     * Calculate cosine similarity between two vectors
-     * @param array $vec1
-     * @param array $vec2
-     * @return float
-     */
+    // Store document method
+    public function storeDocument($title, $content) {
+        $tokens = $this->tokenize($content);
+
+        // Instantiate EntityFactory
+        $entityFactory = new \REDCapEntity\EntityFactory();
+
+        // Retrieve all entity IDs for IDF calculation
+        $ids = $this->getAllEntityIds('chatbot_contextdb');
+
+        // Retrieve all documents for IDF calculation using IDs
+        $entities = $entityFactory->loadInstances('chatbot_contextdb', $ids);
+
+        $allDocuments = [];
+        foreach ($entities as $entity) {
+            $docTokens = json_decode($entity->getData()['tfidf_vector'], true);
+            $allDocuments[] = $docTokens;
+        }
+        $allDocuments[] = $tokens; // Include the new document
+
+        // Calculate new IDF values
+        $idf = $this->calculateIDF($allDocuments);
+
+        // Calculate TF-IDF for the new document
+        $tfidf = $this->calculateTFIDF($tokens, $idf);
+        $serialized_vector = json_encode($tfidf);
+        $data = [
+            'title' => $title,
+            'raw_content' => $content,
+            'tfidf_vector' => $serialized_vector
+        ];
+
+        $this->emDebug("dos it get here?", $data);
+        // Store the new document with its TF-IDF vector
+        $entity = new \REDCapEntity\Entity($entityFactory, 'chatbot_contextdb');
+        $entity->setData($data);
+        $entity->save();
+    }
+
+    // Cosine similarity calculation method
     private function cosineSimilarity($vec1, $vec2) {
-        $dot_product = array_sum(array_map(fn($a, $b) => $a * $b, $vec1, $vec2));
-        $magnitude1 = sqrt(array_sum(array_map(fn($x) => $x * $x, $vec1)));
-        $magnitude2 = sqrt(array_sum(array_map(fn($x) => $x * $x, $vec2)));
+        $dotProduct = 0;
+        $normVec1 = 0;
+        $normVec2 = 0;
 
-        return $dot_product / ($magnitude1 * $magnitude2);
+        foreach ($vec1 as $key => $value) {
+            $dotProduct += $value * ($vec2[$key] ?? 0);
+            $normVec1 += $value ** 2;
+        }
+
+        foreach ($vec2 as $value) {
+            $normVec2 += $value ** 2;
+        }
+
+        $normVec1 = sqrt($normVec1);
+        $normVec2 = sqrt($normVec2);
+
+        if ($normVec1 == 0 || $normVec2 == 0) {
+            return 0; // Return zero if either vector norm is zero
+        }
+
+        return $dotProduct / ($normVec1 * $normVec2);
     }
+
 
     /**
      * @return \Stanford\SecureChatAI\SecureChatAI
@@ -270,7 +423,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      */
     public function getSecureChatInstance(): \Stanford\SecureChatAI\SecureChatAI
     {
-
         if(empty($this->secureChatInstance)){
             $this->setSecureChatInstance(\ExternalModules\ExternalModules::getModuleInstance(self::SecureChatInstanceModuleName));
             return $this->secureChatInstance;
@@ -286,7 +438,5 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     {
         $this->secureChatInstance = $secureChatInstance;
     }
-
-
 }
 ?>

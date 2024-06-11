@@ -99,9 +99,10 @@
 }
 
 .delete-icon {
-    float: right;
-    margin-left: 10px;
     cursor: pointer;
     color: red;
+    position:absolute;
+    top:0;
+    right:0;
 }
 
