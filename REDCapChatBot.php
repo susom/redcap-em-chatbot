@@ -4,11 +4,9 @@ namespace Stanford\REDCapChatBot;
 require 'vendor/autoload.php';
 require_once "emLoggerTrait.php";
 
-use Phpml\FeatureExtraction\TfIdfTransformer;
-use Phpml\Tokenization\WhitespaceTokenizer;
 use \REDCapEntity\Entity;
 use \REDCapEntity\EntityDB;
-use REDCapEntity\EntityFactory;
+use \REDCapEntity\EntityFactory;
 
 
 class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
@@ -18,17 +16,16 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     private \Stanford\SecureChatAI\SecureChatAI $secureChatInstance;
 
-    const SecureChatInstanceModuleName = 'SecureChatAI';
+    const SecureChatInstanceModuleName = 'wtf';
 
     private $system_context;
-    private $tfIdfTransformer;
+    private $entityFactory;
     private $tokenizer;
 
     public function __construct() {
         parent::__construct();
         $this->system_context = $this->getSystemSetting('chatbot_system_context');
-        $this->tfIdfTransformer = new TfIdfTransformer();
-        $this->tokenizer = new WhitespaceTokenizer();
+        $this->entityFactory = new \REDCapEntity\EntityFactory();
     }
 
     // Define entity types
@@ -50,8 +47,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     'type' => 'long_text',
                     'required' => true,
                 ],
-                'tfidf_vector' => [
-                    'name' => 'TF-IDF Vector',
+                'embedding_vector' => [
+                    'name' => 'Embedding Vector',
                     'type' => 'long_text',
                     'required' => true,
                 ],
@@ -93,6 +90,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $(function () { <?php echo implode(";\n", $cmds) ?> })
         </script>
         <?php
+
+//        $title = "The Enigmatic Festival of Quirp: Unveiling Ancient Traditions";
+//        $content = "The Festival of Quirp is an ancient and enigmatic celebration that has intrigued historians and anthropologists alike. Dating back to the early 3rd century, this festival was celebrated by the secluded Quirpian community, known for their profound connection with nature and celestial phenomena. The festival's highlight is the ceremonial lighting of the 'Eternal Flame,' believed to symbolize the community's everlasting spirit and unity. Participants don intricate costumes adorned with symbols representing the sun, moon, and stars, engaging in the 'Dance of the Moons,' a ritualistic performance said to harmonize human and cosmic energies. The festival also features the 'Feast of the Elements,' where attendees partake in a communal meal consisting of locally sourced foods, honoring the earth's bounty. Despite its decline in the modern era, the Festival of Quirp remains a subject of fascination, with scholars continually uncovering new insights into its rich cultural heritage.";
+//        $this->storeDocument($title, $content);
     }
 
     public function injectIntegrationUI() {
@@ -214,7 +215,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 }
 
                 //CALL API ENDPOINT WITH AUGMENTED CHATML
-                $response = $this->getSecureChatInstance()->callAI($messages);
+                $response = $this->getSecureChatInstance()->callAI("gpt-4o",$messages);
                 $result = $this->formatResponse($response);
 
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
@@ -225,45 +226,14 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         }
     }
 
-    private function tokenize($text) {
-        return $this->tokenizer->tokenize($text);
-    }
-
-    private function calculateIDF($allDocuments) {
-        $idf = [];
-        $totalDocuments = count($allDocuments);
-
-        foreach ($allDocuments as $tokens) {
-            foreach (array_unique($tokens) as $word) {
-                if (!isset($idf[$word])) {
-                    $idf[$word] = 0;
-                }
-                $idf[$word]++;
-            }
+    private function getEmbedding($text) {
+        try {
+            $result = $this->getSecureChatInstance()->callAI("ada-002", $text);
+            return $result['data'][0]['embedding'];
+        } catch (GuzzleException $e) {
+            $this->emError("Guzzle error: " . $e->getMessage());
+            return null;
         }
-
-        foreach ($idf as $word => $count) {
-            $idf[$word] = log($totalDocuments / $count);
-        }
-
-        return $idf;
-    }
-
-    private function calculateTFIDF($tokens, $idf) {
-        // Step 1: Calculate Term Frequency (TF)
-        $tf = array_count_values($tokens);
-        $totalTokens = count($tokens);
-        foreach ($tf as $word => $count) {
-            $tf[$word] = $count / $totalTokens;
-        }
-
-        // Step 2: Calculate TF-IDF
-        $tfidf = [];
-        foreach ($tf as $word => $value) {
-            $tfidf[$word] = $value * ($idf[$word] ?? 0);
-        }
-
-        return $tfidf;
     }
 
     private function getAllEntityIds($entityType) {
@@ -291,51 +261,18 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         }
 
         $query = $lastElement['content'];
-        $queryTokens = $this->tokenize($query);
+        $queryEmbedding = $this->getEmbedding($query);
 
-        try {
-            // Check if the EntityFactory class is accessible
-            if (!class_exists('REDCapEntity\EntityFactory')) {
-                $this->emError("REDCapEntity\EntityFactory class does not exist.");
-                return null;
-            }
-
-            // Instantiate EntityFactory
-            $entityFactory = new EntityFactory();
-
-            // Retrieve all entity IDs for IDF calculation
-            $ids = $this->getAllEntityIds('chatbot_contextdb');
-
-            // Retrieve all documents for IDF calculation using IDs
-            $entities = $entityFactory->loadInstances('chatbot_contextdb', $ids);
-        } catch (Exception $e) {
-            $this->emError("Error retrieving entities: " . $e->getMessage());
-            return null;
-        } catch (Throwable $e) {
-            $this->emError("Error retrieving entities (Throwable): " . $e->getMessage());
+        if (!$queryEmbedding) {
             return null;
         }
 
-        if (empty($entities)) {
-            return null;
-        }
-
-        $allDocuments = [];
-        foreach ($entities as $entity) {
-            $docTokens = json_decode($entity->getData()['tfidf_vector'], true);
-            $allDocuments[] = $docTokens;
-        }
-
-        // Calculate IDF values
-        $idf = $this->calculateIDF($allDocuments);
-
-        // Calculate TF-IDF for the query
-        $queryTFIDF = $this->calculateTFIDF($queryTokens, $idf);
-
+        $entities = $this->entityFactory->loadInstances('chatbot_contextdb', $this->getAllEntityIds('chatbot_contextdb'));
         $documents = [];
+
         foreach ($entities as $entity) {
-            $docTokens = json_decode($entity->getData()['tfidf_vector'], true);
-            $similarity = $this->cosineSimilarity($queryTFIDF, $docTokens);
+            $docEmbedding = json_decode($entity->getData()['embedding_vector'], true);
+            $similarity = $this->cosineSimilarity($queryEmbedding, $docEmbedding);
 
             $documents[] = [
                 'id' => $entity->getId(),
@@ -354,40 +291,19 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     // Store document method
     public function storeDocument($title, $content) {
-        $tokens = $this->tokenize($content);
+        // Get the embedding for the content
+        $embedding = $this->getEmbedding($content);
+        $serialized_embedding = json_encode($embedding);
 
-        // Instantiate EntityFactory
-        $entityFactory = new \REDCapEntity\EntityFactory();
+        // Store the new document with its embedding vector
+        $entity = new \REDCapEntity\Entity($this->entityFactory, 'chatbot_contextdb');
 
-        // Retrieve all entity IDs for IDF calculation
-        $ids = $this->getAllEntityIds('chatbot_contextdb');
-
-        // Retrieve all documents for IDF calculation using IDs
-        $entities = $entityFactory->loadInstances('chatbot_contextdb', $ids);
-
-        $allDocuments = [];
-        foreach ($entities as $entity) {
-            $docTokens = json_decode($entity->getData()['tfidf_vector'], true);
-            $allDocuments[] = $docTokens;
-        }
-        $allDocuments[] = $tokens; // Include the new document
-
-        // Calculate new IDF values
-        $idf = $this->calculateIDF($allDocuments);
-
-        // Calculate TF-IDF for the new document
-        $tfidf = $this->calculateTFIDF($tokens, $idf);
-        $serialized_vector = json_encode($tfidf);
-        $data = [
+        $entity->setData([
             'title' => $title,
             'raw_content' => $content,
-            'tfidf_vector' => $serialized_vector
-        ];
+            'embedding_vector' => $serialized_embedding
+        ]);
 
-        $this->emDebug("dos it get here?", $data);
-        // Store the new document with its TF-IDF vector
-        $entity = new \REDCapEntity\Entity($entityFactory, 'chatbot_contextdb');
-        $entity->setData($data);
         $entity->save();
     }
 
