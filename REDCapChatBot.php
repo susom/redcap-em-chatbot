@@ -16,7 +16,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     private \Stanford\SecureChatAI\SecureChatAI $secureChatInstance;
 
-    const SecureChatInstanceModuleName = 'wtf';
+    const SecureChatInstanceModuleName = 'secure_chat_ai';
 
     private $system_context;
     private $entityFactory;
@@ -24,7 +24,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     public function __construct() {
         parent::__construct();
-        $this->system_context = $this->getSystemSetting('chatbot_system_context');
         $this->entityFactory = new \REDCapEntity\EntityFactory();
     }
 
@@ -67,6 +66,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         try {
             preg_match('/redcap_v[\d\.].*\/index\.php/m', $_SERVER['SCRIPT_NAME'], $matches, PREG_OFFSET_CAPTURE);
             if (strpos($_SERVER['SCRIPT_NAME'], 'ProjectSetup') !== false || !empty($matches)) {
+                $this->system_context = $this->getSystemSetting('chatbot_system_context');
                 $this->injectIntegrationUI();
             }
         } catch (\Exception $e) {
