@@ -93,11 +93,14 @@ export const ChatContextProvider = ({ children }) => {
         setMsgCount(0);
         setMessages([]);
         setSessionId(newSessionId);
-        // Clear chatContext and apiContext without saving
+
+        // Filter apiContext to keep only "system" roles
+        const filteredApiContext = apiContextRef.current.filter(entry => entry.role === "system");
         chatContextRef.current = [];
-        apiContextRef.current = [];
+        apiContextRef.current = filteredApiContext;
+
         setChatContext([]);
-        setApiContext([]);
+        setApiContext(filteredApiContext);
     };
 
     const replaceSession = async (session) => {
