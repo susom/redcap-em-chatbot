@@ -69,6 +69,16 @@
         }
     ],
 
+    "crons": [
+        {
+            "cron_name": "daily_context_pull",
+            "cron_description": "This cron will run daily to look for new updated Context to add to the Support Context DB.",
+            "method": "dailyCronRun",
+            "cron_frequency": "86400",
+            "cron_max_run_time": "3600"
+        }
+    ],
+
     "compatibility": {
         "php-version-min": "",
         "php-version-max": "",

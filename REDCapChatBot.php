@@ -217,7 +217,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 //CALL API ENDPOINT WITH AUGMENTED CHATML
                 $response = $this->getSecureChatInstance()->callAI("gpt-4o", array("messages" => $messages));
                 $result = $this->formatResponse($response);
-
+                
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
                 return json_encode($result);
 
@@ -289,24 +289,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return array_slice($documents, 0, 3);
     }
 
-    // Store document method
-    public function storeDocument($title, $content) {
-        // Get the embedding for the content
-        $embedding = $this->getEmbedding($content);
-        $serialized_embedding = json_encode($embedding);
-
-        // Store the new document with its embedding vector
-        $entity = new \REDCapEntity\Entity($this->entityFactory, 'chatbot_contextdb');
-
-        $entity->setData([
-            'title' => $title,
-            'raw_content' => $content,
-            'embedding_vector' => $serialized_embedding
-        ]);
-
-        $entity->save();
-    }
-
     // Cosine similarity calculation method
     private function cosineSimilarity($vec1, $vec2) {
         $dotProduct = 0;
@@ -332,6 +314,24 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $dotProduct / ($normVec1 * $normVec2);
     }
 
+    // Store document method
+    public function storeDocument($title, $content) {
+        // Get the embedding for the content
+        $embedding = $this->getEmbedding($content);
+        $serialized_embedding = json_encode($embedding);
+
+        // Store the new document with its embedding vector
+        $entity = new \REDCapEntity\Entity($this->entityFactory, 'chatbot_contextdb');
+
+        $entity->setData([
+            'title' => $title,
+            'raw_content' => $content,
+            'embedding_vector' => $serialized_embedding
+        ]);
+
+        $entity->save();
+    }
+
 
     /**
      * @return \Stanford\SecureChatAI\SecureChatAI
@@ -353,6 +353,64 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     public function setSecureChatInstance(\Stanford\SecureChatAI\SecureChatAI $secureChatInstance): void
     {
         $this->secureChatInstance = $secureChatInstance;
+    }
+
+    /**
+     * Runs daily to perform various checks and update the context database.
+     */
+    public function dailyCronRun() {
+        try {
+            $urls = array(
+                 $this->getUrl('cron/check_rssd_completions.php', true, true)
+                ,$this->getUrl('cron/check_community_portal.php', true, true)
+                ,$this->getUrl('cron/check_med_wiki.php', true, true)
+            ); //has to be page
+
+            foreach($urls as $url){
+                $client 	= new \GuzzleHttp\Client();
+                $response 	= $client->request('GET', $url, array(\GuzzleHttp\RequestOptions::SYNCHRONOUS => true));
+                $this->emDebug("running cron for $url on project $project_id");
+            }
+        } catch (\Exception $e) {
+            \REDCap::logEvent('CRON JOB ERROR: ', $e->getMessage());
+            Entities::createException('CRON JOB ERROR: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Checks for completions in the RSSD system and updates the context database.
+     */
+    private function checkRSSDCompletions() {
+        return;
+
+        // Implement RSSD completions check logic here
+        $title = "RSSD Completion Data";
+        $content = "Example content from RSSD"; // Replace with actual fetched content
+        $this->storeDocument($title, $content);
+    }
+
+    /**
+     * Checks updates from the Community Portal and updates the context database.
+     */
+    private function checkCommunityPortal() {
+        return;
+
+        // Implement Community Portal check logic here
+        $title = "Community Portal Updates";
+        $content = "Example content from the Community Portal"; // Replace with actual fetched content
+        $this->storeDocument($title, $content);
+    }
+
+    /**
+     * Checks updates from the MedWiki system and updates the context database.
+     */
+    private function checkMedWiki() {
+        return;
+
+        // Implement MedWiki check logic here
+        $title = "MedWiki Updates";
+        $content = "Example content from MedWiki"; // Replace with actual fetched content
+        $this->storeDocument($title, $content);
     }
 }
 ?>
