@@ -3,20 +3,19 @@ namespace Stanford\REDCapChatBot;
 
 require 'vendor/autoload.php';
 require_once "emLoggerTrait.php";
-
-use \REDCapEntity\Entity;
-use \REDCapEntity\EntityDB;
-use \REDCapEntity\EntityFactory;
-
+use REDCap;
+use Project;
 
 class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     use emLoggerTrait;
-    const BUILD_FILE_DIR = 'chatbot_ui/build/static/';
+    const BUILD_FILE_DIR = 'chatbot_ui/build/static';
 
     private \Stanford\SecureChatAI\SecureChatAI $secureChatInstance;
+    private \Stanford\RedcapRAG\RedcapRAG $redcapRAGInstance;
 
     const SecureChatInstanceModuleName = 'secure_chat_ai';
+    const RedcapRAGInstanceModuleName = 'redcap_rag';
 
     private $system_context;
     private $entityFactory;
@@ -24,49 +23,14 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     public function __construct() {
         parent::__construct();
-        $this->entityFactory = new \REDCapEntity\EntityFactory();
-    }
-
-    // Define entity types
-    public function redcap_entity_types() {
-        $types = [];
-
-        $types['chatbot_contextdb'] = [
-            'label' => 'Chatbot Context',
-            'label_plural' => 'Chatbot Contexts',
-            'icon' => 'file',
-            'properties' => [
-                'title' => [
-                    'name' => 'Title',
-                    'type' => 'text',
-                    'required' => true,
-                ],
-                'raw_content' => [
-                    'name' => 'Raw Content',
-                    'type' => 'long_text',
-                    'required' => true,
-                ],
-                'embedding_vector' => [
-                    'name' => 'Embedding Vector',
-                    'type' => 'long_text',
-                    'required' => true,
-                ],
-            ],
-        ];
-
-        return $types;
-    }
-
-    // Hook to trigger entity initialization on module enablement
-    public function redcap_module_system_enable($version) {
-        \REDCapEntity\EntityDB::buildSchema($this->PREFIX);
     }
 
     public function redcap_every_page_top($project_id) {
+        $this->emDebug("project_id!!", $project_id);
+
         try {
             preg_match('/redcap_v[\d\.].*\/index\.php/m', $_SERVER['SCRIPT_NAME'], $matches, PREG_OFFSET_CAPTURE);
             if (strpos($_SERVER['SCRIPT_NAME'], 'ProjectSetup') !== false || !empty($matches)) {
-                $this->system_context = $this->getSystemSetting('chatbot_system_context');
                 $this->injectIntegrationUI();
             }
         } catch (\Exception $e) {
@@ -80,7 +44,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             "window.chatbot_jsmo_module = " . $this->getJavascriptModuleObjectName()
         ];
 
-        $initial_system_context = $this->appendSystemContext(array(), $this->system_context);
+        $initial_system_context = null;
         $data = !empty($initial_system_context) ? $initial_system_context : null;
         if (!empty($data)) $cmds[] = "window.chatbot_jsmo_module.data = " . json_encode($data);
         if (!empty($init_method)) $cmds[] = "window.chatbot_jsmo_module.afterRender(chatbot_jsmo_module." . $init_method . ")";
@@ -90,10 +54,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $(function () { <?php echo implode(";\n", $cmds) ?> })
         </script>
         <?php
-
 //        $title = "The Enigmatic Festival of Quirp: Unveiling Ancient Traditions";
 //        $content = "The Festival of Quirp is an ancient and enigmatic celebration that has intrigued historians and anthropologists alike. Dating back to the early 3rd century, this festival was celebrated by the secluded Quirpian community, known for their profound connection with nature and celestial phenomena. The festival's highlight is the ceremonial lighting of the 'Eternal Flame,' believed to symbolize the community's everlasting spirit and unity. Participants don intricate costumes adorned with symbols representing the sun, moon, and stars, engaging in the 'Dance of the Moons,' a ritualistic performance said to harmonize human and cosmic energies. The festival also features the 'Feast of the Elements,' where attendees partake in a communal meal consisting of locally sourced foods, honoring the earth's bounty. Despite its decline in the modern era, the Festival of Quirp remains a subject of fascination, with scholars continually uncovering new insights into its rich cultural heritage.";
-//        $this->storeDocument($title, $content);
+//        $this->getRedcapRAGInstance()->storeDocument($title, $content);
     }
 
     public function injectIntegrationUI() {
@@ -116,7 +79,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $dir_files = scandir($full_path);
 
             if (!$dir_files) {
-                $this->emError("No directory files found in $full_path");
                 continue;
             }
 
@@ -188,7 +150,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         $hasSystemContext = false;
         for ($i = 0; $i < count($chatMlArray); $i++) {
             if ($chatMlArray[$i]['role'] == 'system') {
-                $chatMlArray[$i]['content'] .= '\n\n ' . $newContext;
+                $chatMlArray[$i]['content'] .= "\n\nRAG Data:\n\n" . $newContext;
                 $hasSystemContext = true;
                 break;
             }
@@ -201,23 +163,172 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $chatMlArray;
     }
 
+
+    /**
+     * Retrieves and formats the current REDCap project's metadata for chatbot context injection.
+     *
+     * @return string Formatted project context string.
+     */
+    public function getProjectContext()
+    {
+        global $Proj;
+
+        // Check if the Project object is available
+        if (!$Proj) {
+            return json_encode(["error" => "Project information is unavailable."]);
+        }
+
+        // Define cache parameters
+        $cacheFile = sys_get_temp_dir() . "/redcap_project_metadata_{$Proj->project_id}.json";
+        $cacheDuration = 3600; // Cache duration in seconds (e.g., 1 hour)
+
+        // Check if cached data exists and is still valid
+        if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheDuration)) {
+            $cachedData = file_get_contents($cacheFile);
+            if ($cachedData) {
+                return $cachedData;
+            }
+        }
+
+        // Initialize an associative array to hold project metadata
+        $projectMetadata = [];
+
+        // **1. Basic Project Information**
+        $projectMetadata['ProjectTitle'] = $Proj->project['app_title'] ?? 'N/A';
+        $purposeCode = $Proj->project['purpose'] ?? 0;
+        $projectMetadata['ProjectPurpose'] = $purposeCode;
+        $projectMetadata['CreationDate'] = $Proj->project['creation_time'] ?? 'N/A';
+        $projectMetadata['ProjectStatus'] = $Proj->project['status'] ?? 'N/A';
+
+        // **2. Instruments (Forms/Surveys)**
+        $projectMetadata['Instruments'] = array_keys($Proj->forms);
+
+        // **3. Events (For Longitudinal Projects)**
+        if ($Proj->longitudinal) {
+            $events = [];
+            foreach ($Proj->eventInfo as $eventId => $event) {
+                $events[] = [
+                    'EventName' => $event['name'],
+                    'EventLabel' => $event['descrip']
+                ];
+            }
+            $projectMetadata['Events'] = $events;
+        }
+
+        // **4. Data Access Groups (If Applicable)**
+        if (!empty($Proj->groups)) {
+            $dataAccessGroups = [];
+            foreach ($Proj->groups as $groupId => $groupName) {
+                $dataAccessGroups[] = [
+                    'GroupID' => $groupId,
+                    'GroupName' => $groupName
+                ];
+            }
+            $projectMetadata['DataAccessGroups'] = $dataAccessGroups;
+        }
+
+        // **5. User Roles and Permissions**
+        $userRights = REDCap::getUserRights();
+        $userRoles = [];
+        foreach ($userRights as $username => $rights) {
+            $userRoles[] = [
+                'Username' => $username,
+                'Role' => $rights['role'] ?? 'No Role',
+                'Data Access Groups' => $rights['group_id'] ?? 'None'
+            ];
+        }
+        $projectMetadata['UserRoles'] = $userRoles;
+
+        // **6. Custom Project Attributes (e.g., IRB Number)**
+        // Replace 'irb_number_field' with the actual field name where IRB number is stored
+        // If IRB number is stored in project notes or another custom attribute, adjust accordingly
+        $projectMetadata['IRBNumber'] = $Proj->project['irb_number_field'] ?? 'N/A';
+
+        // **7. Branching Logic and Calculations (Optional)**
+        // You can extract more detailed field information if needed
+        $fields = [];
+        foreach ($Proj->metadata as $field) {
+            $fields[] = [
+                'FieldName' => $field['field_name'],
+                'FieldLabel' => $field['field_label'],
+                'FieldType' => $field['field_type'],
+                'Choices' => $field['select_choices_or_calculations'] ?? '',
+                'BranchingLogic' => $field['branching_logic'] ?? '',
+                'Validation' => $field['text_validation_type_or_show_slider_number'] ?? ''
+            ];
+        }
+        $projectMetadata['Fields'] = $fields;
+
+        // **8. Surveys Information (If Applicable)**
+        if (!empty($Proj->surveys)) {
+            $surveys = [];
+            foreach ($Proj->surveys as $surveyId => $survey) {
+                $surveys[] = [
+                    'SurveyTitle' => $survey['title'],
+                    'SurveyAuth' => $survey['auth'] ?? 'N/A',
+                    'SurveyEmailInvitation' => $survey['email_inv'] ?? 'N/A',
+                    // Add more survey-specific attributes as needed
+                ];
+            }
+            $projectMetadata['Surveys'] = $surveys;
+        }
+
+        // **Convert the associative array to JSON**
+        $json = json_encode($projectMetadata, JSON_PRETTY_PRINT);
+        if (!$json) {
+            return json_encode(["error" => "Failed to convert project metadata to JSON."]);
+        }
+
+        // **Cache the JSON output**
+        file_put_contents($cacheFile, $json);
+
+        return $json;
+    }
+
+
     public function redcap_module_ajax($action, $payload, $project_id, $record, $instrument, $event_id, $repeat_instance,
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
         switch ($action) {
             case "callAI":
                 $messages = $this->sanitizeInput($payload);
 
-                //FIND AND INJECT RAG
-                $relevantDocs = $this->getRelevantDocuments($messages);
+                //DON'T WASTE LOGGING ON SYSTEM DATA INJECT IT HERE NOT ON THE INJECT
+                $initial_system_context = $this->getSystemSetting('chatbot_system_context');
+                if(!empty($initial_system_context)){
+                    $messages = $this->appendSystemContext($messages, $initial_system_context);
+                }
+
+                //ADD IN PROJECT DICTIONARY!!
+                $current_project_context = $this->getProjectContext();
+                if(!empty($current_project_context)){
+                    // Format the context string
+                    $current_project_context = "Project Metadata:\n" . $current_project_context;
+                    $messages = $this->appendSystemContext($messages, $current_project_context);
+                }
+
+                $this->emDebug("initial system context 1 and 2", $messages);
+
+
+                //INJECT PROJECT DICTIONARY
+
+
+                //FIND AND INJECT RAG TOO
+                $relevantDocs = $this->getRedcapRAGInstance()->getRelevantDocuments($messages);
                 if (!empty($relevantDocs)) {
-                    $ragContext = implode("\n\n", array_column($relevantDocs, 'raw_content'));
+                    // Extract the "content" column from each document in relevantDocs
+                    $contentArray = array_column($relevantDocs, 'content');
+
+                    // Concatenate the content values into a single string with double newline as separator
+                    $ragContext = implode("\n\n", $contentArray);
+
+                    // Append the concatenated context to the system context
                     $messages = $this->appendSystemContext($messages, $ragContext);
                 }
 
                 //CALL API ENDPOINT WITH AUGMENTED CHATML
                 $response = $this->getSecureChatInstance()->callAI("gpt-4o", array("messages" => $messages));
                 $result = $this->formatResponse($response);
-                
+
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
                 return json_encode($result);
 
@@ -225,113 +336,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 throw new Exception("Action $action is not defined");
         }
     }
-
-    private function getEmbedding($text) {
-        try {
-            $result = $this->getSecureChatInstance()->callAI("ada-002", array("input" => $text));
-            return $result['data'][0]['embedding'];
-        } catch (GuzzleException $e) {
-            $this->emError("Guzzle error: " . $e->getMessage());
-            return null;
-        }
-    }
-
-    private function getAllEntityIds($entityType) {
-        $ids = [];
-        $sql = 'SELECT id FROM `redcap_entity_' . db_escape($entityType) . '`';
-        $result = db_query($sql);
-
-        while ($row = db_fetch_assoc($result)) {
-            $ids[] = $row['id'];
-        }
-
-        return $ids;
-    }
-
-    // Retrieve relevant documents method
-    public function getRelevantDocuments($queryArray) {
-        if (!is_array($queryArray) || empty($queryArray)) {
-            return null;
-        }
-
-        $lastElement = end($queryArray);
-
-        if (!isset($lastElement['role']) || $lastElement['role'] !== 'user' || !isset($lastElement['content'])) {
-            return null;
-        }
-
-        $query = $lastElement['content'];
-        $queryEmbedding = $this->getEmbedding($query);
-
-        if (!$queryEmbedding) {
-            return null;
-        }
-
-        $entities = $this->entityFactory->loadInstances('chatbot_contextdb', $this->getAllEntityIds('chatbot_contextdb'));
-        $documents = [];
-
-        foreach ($entities as $entity) {
-            $docEmbedding = json_decode($entity->getData()['embedding_vector'], true);
-            $similarity = $this->cosineSimilarity($queryEmbedding, $docEmbedding);
-
-            $documents[] = [
-                'id' => $entity->getId(),
-                'title' => $entity->getData()['title'],
-                'raw_content' => $entity->getData()['raw_content'],
-                'similarity' => $similarity
-            ];
-        }
-
-        usort($documents, function($a, $b) {
-            return $b['similarity'] <=> $a['similarity'];
-        });
-
-        return array_slice($documents, 0, 3);
-    }
-
-    // Cosine similarity calculation method
-    private function cosineSimilarity($vec1, $vec2) {
-        $dotProduct = 0;
-        $normVec1 = 0;
-        $normVec2 = 0;
-
-        foreach ($vec1 as $key => $value) {
-            $dotProduct += $value * ($vec2[$key] ?? 0);
-            $normVec1 += $value ** 2;
-        }
-
-        foreach ($vec2 as $value) {
-            $normVec2 += $value ** 2;
-        }
-
-        $normVec1 = sqrt($normVec1);
-        $normVec2 = sqrt($normVec2);
-
-        if ($normVec1 == 0 || $normVec2 == 0) {
-            return 0; // Return zero if either vector norm is zero
-        }
-
-        return $dotProduct / ($normVec1 * $normVec2);
-    }
-
-    // Store document method
-    public function storeDocument($title, $content) {
-        // Get the embedding for the content
-        $embedding = $this->getEmbedding($content);
-        $serialized_embedding = json_encode($embedding);
-
-        // Store the new document with its embedding vector
-        $entity = new \REDCapEntity\Entity($this->entityFactory, 'chatbot_contextdb');
-
-        $entity->setData([
-            'title' => $title,
-            'raw_content' => $content,
-            'embedding_vector' => $serialized_embedding
-        ]);
-
-        $entity->save();
-    }
-
 
     /**
      * @return \Stanford\SecureChatAI\SecureChatAI
@@ -354,6 +358,29 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     {
         $this->secureChatInstance = $secureChatInstance;
     }
+
+    /**
+     * @return \Stanford\SecureChatAI\SecureChatAI
+     * @throws \Exception
+     */
+    public function getRedcapRAGInstance(): \Stanford\RedcapRAG\RedcapRAG
+    {
+        if(empty($this->redcapRAGInstance)){
+            $this->setRedcapRAGInstance(\ExternalModules\ExternalModules::getModuleInstance(self::RedcapRAGInstanceModuleName));
+            return $this->redcapRAGInstance;
+        }else{
+            return $this->redcapRAGInstance;
+        }
+    }
+
+    /**
+     * @param \Stanford\RedcapRAG\RedcapRAG $redcapRAGInstance
+     */
+    public function setRedcapRAGInstance(\Stanford\RedcapRAG\RedcapRAG $redcapRAGInstance): void
+    {
+        $this->redcapRAGInstance = $redcapRAGInstance;
+    }
+
 
     /**
      * Runs daily to perform various checks and update the context database.
@@ -386,7 +413,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         // Implement RSSD completions check logic here
         $title = "RSSD Completion Data";
         $content = "Example content from RSSD"; // Replace with actual fetched content
-        $this->storeDocument($title, $content);
+        $this->getRedcapRAGInstance()->storeDocument($title, $content);
     }
 
     /**
@@ -398,7 +425,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         // Implement Community Portal check logic here
         $title = "Community Portal Updates";
         $content = "Example content from the Community Portal"; // Replace with actual fetched content
-        $this->storeDocument($title, $content);
+        $this->getRedcapRAGInstance()->storeDocument($title, $content);
     }
 
     /**
@@ -410,7 +437,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         // Implement MedWiki check logic here
         $title = "MedWiki Updates";
         $content = "Example content from MedWiki"; // Replace with actual fetched content
-        $this->storeDocument($title, $content);
+        $this->getRedcapRAGInstance()->storeDocument($title, $content);
     }
 }
 ?>

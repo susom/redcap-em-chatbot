@@ -1,11 +1,19 @@
 # REDCap Chatbot
 
-This is an External Module (EM) designed for system-wide distribution to introduce a frontend REDCap Support Chat Bot code.
+This EM integrates a Support Chat Bot UI widget into our Stanford REDCap instance.
 
 ### About the Chatbot
 
-The chatbot is a standalone PHP/REACT-based app, functioning as a REDCap External Module. Its code repository can be found [here](https://github.com/susom/redcap-em-chatbot). It operates in tandem with the comprehensive [SecureChatAI EM](https://github.com/susom/secureChatAI).
+The REDCap Chatbot is a globally installed EM that enhances REDCap's UI by injecting a user-friendly chat widget directly into REDCap pages.
+Users can easily interact with the chatbot inline on their project pages, receiving immediate support for their REDCap-related queries.
 
-### Content of this EM
+### Integration and Dependencies
 
-The frontend REACT component is programmed to produce static build files which can be incorporated into the DOM of an external website for more seamless UI integration. This EM will be enabled universally, incorporating these build files into REDCap's UI. Note, this UI will continue to interact with Stanford's dedicated Secure Chat AI instance.
+The chatbot operates alongside two essential external modules:
+1. **SecureChatAI EM**: Provides the backend for secure and efficient AI interactions with Stanford's Secure GPT API. More details can be found in the [SecureChatAI EM repository](https://github.com/susom/secureChatAI).
+2. **RedcapRAG EM**: Manages relevant data and context to ensure the chatbot provides accurate and helpful answers. More details can be found in the [RedcapRAG repository](https://github.com/susom/RedcapRAG).
+
+### Code Repository
+
+You can find the code repository for this chatbot [here](https://github.com/susom/redcap-em-chatbot).
+

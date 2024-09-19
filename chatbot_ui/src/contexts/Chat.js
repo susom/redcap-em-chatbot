@@ -111,10 +111,14 @@ export const ChatContextProvider = ({ children }) => {
     };
 
     const callAjax = (payload, callback) => {
-        if(apiContextRef.current.length === 0){
-            const initial_system_context = window.chatbot_jsmo_module.getInitialSystemContext().pop();
-            console.log("initial apiContext, if empty , inject system context before first query", initial_system_context);
+        const initialSystemContextArray = window.chatbot_jsmo_module.getInitialSystemContext();
+        if (Array.isArray(initialSystemContextArray) && initialSystemContextArray.length > 0) {
+            const initial_system_context = initialSystemContextArray.pop();
+            console.log("Initial API context is empty. Injecting system context before first query:", initial_system_context);
             addMessage(initial_system_context);
+        } else {
+            console.log("No initial system context available.");
+            // You can decide to proceed without it or handle this case as needed.
         }
 
         addMessage({ role: 'user', content: payload.content });
