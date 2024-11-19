@@ -292,7 +292,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             case "callAI":
                 $messages = $this->sanitizeInput($payload);
 
-                //DON'T WASTE LOGGING ON SYSTEM DATA INJECT IT HERE NOT ON THE INJECT
+                //DON'T WASTE LOGGING ON SYSTEM DATA INJECT IT HERE NOT ON THE INJECT JS
                 $initial_system_context = $this->getSystemSetting('chatbot_system_context');
                 if(!empty($initial_system_context)){
                     $messages = $this->appendSystemContext($messages, $initial_system_context);
@@ -306,24 +306,42 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $messages = $this->appendSystemContext($messages, $current_project_context);
                 }
 
-                $this->emDebug("initial system context 1 and 2", $messages);
+                // Add REDCap actions list to the system context
+                $actions_list_json = $this->getProjectSetting('redcap_actions_list');
+                if (!empty($actions_list_json)) {
+                    $actions_list = json_decode($actions_list_json, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        $actions_context = "Possible Actions:\n" . json_encode($actions_list, JSON_PRETTY_PRINT);
+                        $messages = $this->appendSystemContext($messages, $actions_context);
+                    }
+                }
+
+                // Inject additional instruction for action matching and sentiment analysis
+                $action_matching_context = "Analyze the user's query to determine its intent, match it to the appropriate REDCap action from the provided list (only if relevant!), and determine the sentiment on a scale of 1 to 5 (where 1 is very negative and 5 is very positive). Include this in the response.";
+                $messages = $this->appendSystemContext($messages, $action_matching_context);
 
 
-                //INJECT PROJECT DICTIONARY
+                $this->emDebug("initial general system context and project Metadata", $messages);
 
 
                 //FIND AND INJECT RAG TOO
-                $relevantDocs = $this->getRedcapRAGInstance()->getRelevantDocuments($messages);
-                if (!empty($relevantDocs)) {
-                    // Extract the "content" column from each document in relevantDocs
-                    $contentArray = array_column($relevantDocs, 'content');
-
-                    // Concatenate the content values into a single string with double newline as separator
-                    $ragContext = implode("\n\n", $contentArray);
-
-                    // Append the concatenated context to the system context
-                    $messages = $this->appendSystemContext($messages, $ragContext);
+                // Example: Inject RAG context into messages
+                $redcapRAGInstance = $this->getRedcapRAGInstance();
+                if ($redcapRAGInstance) {
+                    try {
+                        $relevantDocs = $redcapRAGInstance->getRelevantDocuments($messages);
+                        if (!empty($relevantDocs)) {
+                            $contentArray = array_column($relevantDocs, 'content');
+                            $ragContext = implode("\n\n", $contentArray);
+                            $messages = $this->appendSystemContext($messages, $ragContext);
+                        }
+                    } catch (\Exception $e) {
+                        $this->emError("Error retrieving relevant documents from RedcapRAG: " . $e->getMessage());
+                    }
+                } else {
+                    $this->emDebug("RedcapRAG is not available; skipping RAG context injection.");
                 }
+
 
                 //CALL API ENDPOINT WITH AUGMENTED CHATML
                 $response = $this->getSecureChatInstance()->callAI("gpt-4o", array("messages" => $messages));
@@ -360,18 +378,28 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     /**
-     * @return \Stanford\SecureChatAI\SecureChatAI
-     * @throws \Exception
+     * Get the RedcapRAG module instance if available.
+     *
+     * @return \Stanford\RedcapRAG\RedcapRAG|null
      */
-    public function getRedcapRAGInstance(): \Stanford\RedcapRAG\RedcapRAG
+    public function getRedcapRAGInstance(): ?\Stanford\RedcapRAG\RedcapRAG
     {
-        if(empty($this->redcapRAGInstance)){
-            $this->setRedcapRAGInstance(\ExternalModules\ExternalModules::getModuleInstance(self::RedcapRAGInstanceModuleName));
-            return $this->redcapRAGInstance;
-        }else{
-            return $this->redcapRAGInstance;
+        if (empty($this->redcapRAGInstance)) {
+            try {
+                $instance = \ExternalModules\ExternalModules::getModuleInstance(self::RedcapRAGInstanceModuleName);
+                if ($instance) {
+                    $this->setRedcapRAGInstance($instance);
+                } else {
+                    $this->emDebug("RedcapRAG module is not installed or enabled.");
+                }
+            } catch (\Exception $e) {
+                $this->emError("Error loading RedcapRAG module: " . $e->getMessage());
+            }
         }
+        return $this->redcapRAGInstance ?? null;
     }
+
+
 
     /**
      * @param \Stanford\RedcapRAG\RedcapRAG $redcapRAGInstance

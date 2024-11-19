@@ -62,6 +62,12 @@
             "type": "textarea"
         },
         {
+            "key": "redcap_actions_list",
+            "name": "List of potential programatic actions Cappy can do",
+            "required": false,
+            "type": "textarea"
+        },
+        {
             "key": "enable-system-debug-logging",
             "name": "<b>Enable Debug Logging (system-wide)</b><i>(optional)</i> Requires installation and configuration of emLogger",
             "required": false,
