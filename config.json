@@ -3,7 +3,7 @@
 
     "namespace": "Stanford\\REDCapChatBot",
 
-    "description": "An EM intended for system wide distribution to inject frontend Support Chat Bot code",
+    "description": "A system-wide External Module to inject and manage frontend support chatbot functionality across all REDCap pages.",
 
     "documentation": "README.md",
 
@@ -25,9 +25,6 @@
     "enable-every-page-hooks-on-system-pages": true,
 
     "links": {
-        "project": [
-
-        ],
         "control-center": [
 
         ]
@@ -41,24 +38,13 @@
         "callAI"
     ],
 
-    "no-auth-ajax-actions": [
-        "callAI"
-    ],
-
-    "project-settings": [
-        {
-            "key": "enable-project-debug-logging",
-            "name": "<b>Enable Debug Logging</b><br><i>(optional)</i> Requires installation and configuration of emLogger",
-            "required": false,
-            "type": "checkbox"
-        }
-    ],
+    "no-auth-ajax-actions": [],
 
     "system-settings": [
         {
             "key": "chatbot_system_context",
             "name": "Raw text to inject into system context",
-            "required": true,
+            "required": false,
             "type": "textarea"
         },
         {

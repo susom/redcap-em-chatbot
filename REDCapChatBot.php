@@ -26,17 +26,29 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     public function redcap_every_page_top($project_id) {
-        $this->emDebug("project_id!!", $project_id);
-
         try {
-            preg_match('/redcap_v[\d\.].*\/index\.php/m', $_SERVER['SCRIPT_NAME'], $matches, PREG_OFFSET_CAPTURE);
-            if (strpos($_SERVER['SCRIPT_NAME'], 'ProjectSetup') !== false || !empty($matches)) {
-                $this->injectIntegrationUI();
+            // List of pages to exclude UI injection
+            $excludedPages = [
+                '/surveys/' // Example: Exclude survey pages
+            ];
+
+            $currentPage = $_SERVER['SCRIPT_NAME'] ?? '';
+
+            // Inject UI unless the current page is in the exclusion list
+            foreach ($excludedPages as $excludedPage) {
+                if (strpos($currentPage, $excludedPage) !== false) {
+                    return; // Stop execution if the page is excluded
+                }
             }
+
+            // Inject the UI
+            $this->injectIntegrationUI();
+
         } catch (\Exception $e) {
-            \REDCap::logEvent('Exception initiating REDCap Chatbot.', $e->getMessage());
+            \REDCap::logEvent('Exception injecting chatbot UI.', $e->getMessage());
         }
     }
+
 
     public function injectJSMO($data = null, $init_method = null): void {
         echo $this->initializeJavascriptModuleObject();
@@ -66,7 +78,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             echo $file;
         }
         echo '<div id="chatbot_ui_container"></div>';
-        $this->emdebug("injectIntegrationUI() End");
     }
 
     public function generateAssetFiles(): array {
@@ -175,7 +186,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
         // Check if the Project object is available
         if (!$Proj) {
-            return json_encode(["error" => "Project information is unavailable."]);
+            return false;
         }
 
         // Define cache parameters
@@ -286,8 +297,16 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
 
-    public function redcap_module_ajax($action, $payload, $project_id, $record, $instrument, $event_id, $repeat_instance,
+
+    public function redcap_module_ajax($action, $payload, $project_id=null, $record, $instrument, $event_id, $repeat_instance,
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
+
+        if ($project_id === null) {
+            $this->emDebug("redcap_module_ajax ($action) system page!");
+        } else {
+            $this->emDebug("redcap_module_ajax ($action) project page : $project_id");
+        }
+
         switch ($action) {
             case "callAI":
                 $messages = $this->sanitizeInput($payload);
@@ -298,7 +317,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $messages = $this->appendSystemContext($messages, $initial_system_context);
                 }
 
-                //ADD IN PROJECT DICTIONARY!!
+                //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
                 $current_project_context = $this->getProjectContext();
                 if(!empty($current_project_context)){
                     // Format the context string
@@ -306,8 +325,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $messages = $this->appendSystemContext($messages, $current_project_context);
                 }
 
-                // Add REDCap actions list to the system context
-                $actions_list_json = $this->getProjectSetting('redcap_actions_list');
+                //Add REDCap actions list to the system context
+                $actions_list_json = $this->getSystemSetting('redcap_actions_list');
                 if (!empty($actions_list_json)) {
                     $actions_list = json_decode($actions_list_json, true);
                     if (json_last_error() === JSON_ERROR_NONE) {
@@ -319,10 +338,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 // Inject additional instruction for action matching and sentiment analysis
                 $action_matching_context = "Analyze the user's query to determine its intent, match it to the appropriate REDCap action from the provided list (only if relevant!), and determine the sentiment on a scale of 1 to 5 (where 1 is very negative and 5 is very positive). Include this in the response.";
                 $messages = $this->appendSystemContext($messages, $action_matching_context);
-
-
-                $this->emDebug("initial general system context and project Metadata", $messages);
-
 
                 //FIND AND INJECT RAG TOO
                 // Example: Inject RAG context into messages
@@ -338,10 +353,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     } catch (\Exception $e) {
                         $this->emError("Error retrieving relevant documents from RedcapRAG: " . $e->getMessage());
                     }
-                } else {
-                    $this->emDebug("RedcapRAG is not available; skipping RAG context injection.");
                 }
 
+                //$this->emDebug("initial general system context and project Metadata and RAG", $messages);
 
                 //CALL API ENDPOINT WITH AUGMENTED CHATML
                 $response = $this->getSecureChatInstance()->callAI("gpt-4o", array("messages" => $messages));
