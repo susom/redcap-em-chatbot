@@ -17,6 +17,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     const SecureChatInstanceModuleName = 'secure_chat_ai';
     const RedcapRAGInstanceModuleName = 'redcap_rag';
 
+    const DEFAULT_PROJECT_IDENTIFIER = 'chatbot_contextdb';
+    const RAG_CONTEXT_PREFIX = "RAG Data:\n\n";
+
     private $system_context;
     private $entityFactory;
     private $tokenizer;
@@ -28,9 +31,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     public function redcap_every_page_top($project_id) {
         try {
             // List of pages to exclude UI injection
-            $excludedPages = [
-                '/surveys/' // Example: Exclude survey pages
-            ];
+            $exclusion_list = $this->getSystemSetting("chatbot_exclude_list");
+            $excludedPages = array_map('trim', explode(",", $exclusion_list));
 
             $currentPage = $_SERVER['SCRIPT_NAME'] ?? '';
 
@@ -94,19 +96,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             }
 
             foreach ($dir_files as $file) {
-                if ($file === '.' || $file === '..') {
-                    continue;
-                }
-
-                $url = $this->getUrl(self::BUILD_FILE_DIR . '/' . $folder . '/' . $file);
-                $html = '';
                 if (str_contains($file, '.js')) {
-                    $html = "<script type='module' crossorigin src='{$url}'></script>";
+                    $assets[] = "<script type='module' crossorigin src='{$this->getUrl(self::BUILD_FILE_DIR . '/' . $folder . '/' . $file)}'></script>";
                 } elseif (str_contains($file, '.css')) {
-                    $html = "<link rel='stylesheet' href='{$url}'>";
-                }
-                if ($html !== '') {
-                    $assets[] = $html;
+                    $assets[] = "<link rel='stylesheet' href='{$this->getUrl(self::BUILD_FILE_DIR . '/' . $folder . '/' . $file)}'>";
                 }
             }
         }
@@ -114,27 +107,17 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $assets;
     }
 
-    public function sanitizeInput($payload): array|string {
-        $sanitizedPayload = array();
-
+    public function sanitizeInput($payload): array {
+        $sanitized = [];
         if (is_array($payload)) {
             foreach ($payload as $message) {
-                if (
-                    isset($message['role']) && is_string($message['role']) &&
-                    isset($message['content']) && is_string($message['content'])
-                ) {
-                    $sanitizedRole = filter_var($message['role'], FILTER_SANITIZE_STRING);
-                    $sanitizedContent = filter_var($message['content'], FILTER_SANITIZE_STRING);
-
-                    $sanitizedPayload[] = array(
-                        'role' => $sanitizedRole,
-                        'content' => $sanitizedContent
-                    );
-                }
+                $sanitized[] = [
+                    'role' => filter_var($message['role'], FILTER_SANITIZE_STRING),
+                    'content' => filter_var($message['content'], FILTER_SANITIZE_STRING),
+                ];
             }
         }
-
-        return $sanitizedPayload;
+        return $sanitized;
     }
 
     public function formatResponse($response) {
@@ -300,13 +283,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     public function redcap_module_ajax($action, $payload, $project_id=null, $record, $instrument, $event_id, $repeat_instance,
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
-
-        if ($project_id === null) {
-            $this->emDebug("redcap_module_ajax ($action) system page!");
-        } else {
-            $this->emDebug("redcap_module_ajax ($action) project page : $project_id");
-        }
-
         switch ($action) {
             case "callAI":
                 $messages = $this->sanitizeInput($payload);
@@ -340,19 +316,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $messages = $this->appendSystemContext($messages, $action_matching_context);
 
                 //FIND AND INJECT RAG TOO
-                // Example: Inject RAG context into messages
-                $redcapRAGInstance = $this->getRedcapRAGInstance();
-                if ($redcapRAGInstance) {
-                    try {
-                        $relevantDocs = $redcapRAGInstance->getRelevantDocuments($messages);
-                        if (!empty($relevantDocs)) {
-                            $contentArray = array_column($relevantDocs, 'content');
-                            $ragContext = implode("\n\n", $contentArray);
-                            $messages = $this->appendSystemContext($messages, $ragContext);
-                        }
-                    } catch (\Exception $e) {
-                        $this->emError("Error retrieving relevant documents from RedcapRAG: " . $e->getMessage());
-                    }
+                $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
+                $ragContext = $this->getRedcapRAGInstance()?->getRelevantDocuments($projectIdentifier, $messages) ?? [];
+                foreach ($ragContext as $doc) {
+                    $messages = $this->appendSystemContext($messages, self::RAG_CONTEXT_PREFIX . $doc['content']);
                 }
 
                 //$this->emDebug("initial general system context and project Metadata and RAG", $messages);
@@ -435,10 +402,14 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 ,$this->getUrl('cron/check_med_wiki.php', true, true)
             ); //has to be page
 
-            foreach($urls as $url){
-                $client 	= new \GuzzleHttp\Client();
-                $response 	= $client->request('GET', $url, array(\GuzzleHttp\RequestOptions::SYNCHRONOUS => true));
-                $this->emDebug("running cron for $url on project $project_id");
+            foreach ($urls as $url) {
+                try {
+                    $client = new \GuzzleHttp\Client();
+                    $response = $client->request('GET', $url, [\GuzzleHttp\RequestOptions::SYNCHRONOUS => true]);
+                    $this->emDebug("Successfully ran cron for $url");
+                } catch (\Exception $e) {
+                    $this->emError("Error running cron for $url: " . $e->getMessage());
+                }
             }
         } catch (\Exception $e) {
             \REDCap::logEvent('CRON JOB ERROR: ', $e->getMessage());

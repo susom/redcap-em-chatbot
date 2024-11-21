@@ -54,6 +54,12 @@
             "type": "textarea"
         },
         {
+            "key": "chatbot_exclude_list",
+            "name": "Comma delimited list of url fragments not to show Cappy on",
+            "required": false,
+            "type": "textarea"
+        },
+        {
             "key": "enable-system-debug-logging",
             "name": "<b>Enable Debug Logging (system-wide)</b><i>(optional)</i> Requires installation and configuration of emLogger",
             "required": false,
