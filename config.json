@@ -1,9 +1,10 @@
 {
-    "name": "REDCapChatBot",
+    "name": "Cappy - REDCap Support Bot",
 
     "namespace": "Stanford\\REDCapChatBot",
 
-    "description": "A system-wide External Module to inject and manage frontend support chatbot functionality across all REDCap pages.",
+    "description": "Cappy is an EM enabled system-wide to inject and manage frontend support chatbot functionality across all REDCap pages.",
+
 
     "documentation": "README.md",
 
@@ -25,14 +26,10 @@
     "enable-every-page-hooks-on-system-pages": true,
 
     "links": {
-        "control-center": [
-
-        ]
+        "control-center": []
     },
 
-    "no-auth-pages": [
-
-    ],
+    "no-auth-pages": [],
 
     "auth-ajax-actions": [
         "callAI"
@@ -43,25 +40,25 @@
     "system-settings": [
         {
             "key": "chatbot_system_context",
-            "name": "Raw text to inject into system context",
+            "name": "Raw text to inject into system context for Cappy",
             "required": false,
             "type": "textarea"
         },
         {
             "key": "redcap_actions_list",
-            "name": "List of potential programatic actions Cappy can do",
+            "name": "List of potential programmatic actions Cappy can perform",
             "required": false,
             "type": "textarea"
         },
         {
             "key": "chatbot_exclude_list",
-            "name": "Comma delimited list of url fragments not to show Cappy on",
+            "name": "Comma delimited list of URL fragments to exclude Cappy",
             "required": false,
             "type": "textarea"
         },
         {
             "key": "enable-system-debug-logging",
-            "name": "<b>Enable Debug Logging (system-wide)</b><i>(optional)</i> Requires installation and configuration of emLogger",
+            "name": "<b>Enable Debug Logging for Cappy (system-wide)</b><i>(optional)</i> Requires installation and configuration of emLogger",
             "required": false,
             "type": "checkbox"
         }
@@ -70,7 +67,7 @@
     "crons": [
         {
             "cron_name": "daily_context_pull",
-            "cron_description": "This cron will run daily to look for new updated Context to add to the Support Context DB.",
+            "cron_description": "Cappy's daily cron job to fetch new or updated context and add it to the Support Context DB.",
             "method": "dailyCronRun",
             "cron_frequency": "86400",
             "cron_max_run_time": "3600"
@@ -82,26 +79,5 @@
         "php-version-max": "",
         "redcap-version-min": "",
         "redcap-version-max": ""
-    },
-
-    "entities": {
-        "chatbot_contextdb": {
-            "label": "Context DB for Chatbot",
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "label": "Title"
-                },
-                "raw_content": {
-                    "type": "string",
-                    "label": "Raw Content"
-                },
-                "tfidf_vector": {
-                    "type": "string",
-                    "label": "TF-IDF Vector"
-                }
-            }
-        }
     }
 }
