@@ -4,6 +4,9 @@ namespace Stanford\REDCapChatBot;
 
 $startTS = microtime(true);
 
-$module->checkCommunityPortal();
+// Check for "cron" query parameter and cast to boolean for safety
+$isCron = isset($_GET['cron']) ? filter_var($_GET['cron'], FILTER_VALIDATE_BOOLEAN) : false;
+
+$module->checkCommunityPortal($isCron);
 
 $module->emLog("checkCommunityPortal() page time : " . microtime(true) - $startTS );

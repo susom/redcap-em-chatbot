@@ -433,10 +433,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     public function dailyCronRun() {
         try {
             $urls = array(
-                 $this->getUrl('cron/check_em_project.php', true, true)
-                ,$this->getUrl('cron/check_rssd_completions.php', true, true)
-                ,$this->getUrl('cron/check_community_portal.php', true, true)
-                ,$this->getUrl('cron/check_med_wiki.php', true, true)
+                 $this->getUrl('cron/check_em_project.php?cron=true', true, true)
+                ,$this->getUrl('cron/check_rssd_completions.php?cron=true', true, true)
+                ,$this->getUrl('cron/check_community_portal.php?cron=true', true, true)
+                ,$this->getUrl('cron/check_med_wiki.php?cron=true', true, true)
             ); //has to be page
 
             foreach ($urls as $url) {
@@ -491,13 +491,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         $this->getRedcapRAGInstance()->storeDocument($projectIdentifier, $title, $content);
     }
 
-    public function checkEMProject($catchAll = false) {
+    public function checkEMProject($cron = false) {
         $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
 
-        // Get last cron run timestamp or fallback to 24 hours ago
-        $lastCronRun = $catchAll ? null : ($this->getSystemSetting('last_cron_run') ?? date("Y-m-d H:i:s", strtotime("-1 day")));
+        // Determine the last cron run timestamp if in cron mode
+        $lastCronRun = $cron ? ($this->getSystemSetting('last_cron_run') ?? date("Y-m-d H:i:s", strtotime("-1 day"))) : null;
 
-        // Fetch all data from the project
+        // Get project ID and fields to fetch
         $projectId = $this->getSystemSetting('rag_emtracking_pid');
         $fields = ['module_name', 'module_display_name', 'module_description', 'maintenance_fee', 'actual_monthly_cost', 'date_created'];
         $records = REDCap::getData([
@@ -515,10 +515,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 continue;
             }
 
-            // If not in catch-all mode, skip records older than $lastCronRun
+            // In cron mode, skip records older than the last cron run
             $dateCreated = $fields['date_created'] ?? null;
-            if (!$catchAll && $dateCreated && $dateCreated <= $lastCronRun) {
-                continue; // Skip older records
+            if ($cron && $dateCreated && $dateCreated <= $lastCronRun) {
+                continue;
             }
 
             $module_name = $fields['module_name'];
@@ -533,10 +533,11 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $this->getRedcapRAGInstance()?->checkAndStoreDocument($projectIdentifier, $module_name, $content, $dateCreated);
         }
 
-        // Update last cron run timestamp if not in catch-all mode
-        if (!$catchAll) {
+        // If in cron mode, update the last cron run timestamp
+        if ($cron) {
             $this->setSystemSetting('last_cron_run', date("Y-m-d H:i:s"));
         }
     }
+
 }
 ?>

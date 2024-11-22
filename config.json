@@ -27,7 +27,12 @@
 
     "links": {
         "control-center": [
-
+            {
+                "name": "Run EM Project Check Cron (all time)",
+                "icon": "fas fa-info-circle",
+                "url" : "cron/check_em_project.php",
+                "show-header-and-footer": false
+            }
         ]
     },
 
