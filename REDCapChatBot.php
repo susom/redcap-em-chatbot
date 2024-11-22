@@ -58,12 +58,19 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $excludedPages = array_map('trim', explode(",", $exclusion_list));
 
             $currentPage = $_SERVER['SCRIPT_NAME'] ?? '';
+            $queryString = $_SERVER['QUERY_STRING'] ?? '';
 
+            $this->emDebug($queryString, preg_match('/pid=(\d+)/', $queryString, $matches), $matches[1]);
             // Inject UI only if the current page is in the "include" list (reusing exclusion logic)
             $inject = false; // Temporary repurpose
             foreach ($excludedPages as $excludedPage) {
                 if (strpos($currentPage, $excludedPage) !== false) {
                     $inject = true; // Mark for injection if included
+                    break;
+                }
+                // Check if the query string contains a matching project ID
+                if (preg_match('/pid=(\d+)/', $queryString, $matches) && $matches[1] == $excludedPage) {
+                    $inject = true;
                     break;
                 }
             }
