@@ -29,18 +29,47 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     public function redcap_every_page_top($project_id) {
+        //THIS IS THE PROPER EXCLUDE LIST FOR CAPPY, comment out for now to make it function as INCLUDE so that i can limited test on prod
+//        try {
+//            // List of pages to exclude UI injection
+//            $exclusion_list = $this->getSystemSetting("chatbot_exclude_list");
+//            $excludedPages = array_map('trim', explode(",", $exclusion_list));
+//
+//            $currentPage = $_SERVER['SCRIPT_NAME'] ?? '';
+//
+//            // Inject UI unless the current page is in the exclusion list
+//            foreach ($excludedPages as $excludedPage) {
+//                if (strpos($currentPage, $excludedPage) !== false) {
+//                    return; // Stop execution if the page is excluded
+//                }
+//            }
+//
+//            // Inject the UI
+//            $this->injectIntegrationUI();
+//
+//        } catch (\Exception $e) {
+//            \REDCap::logEvent('Exception injecting chatbot UI.', $e->getMessage());
+//        }
+
+        // TEMPORARY MAKE IT INCLUDE LIST SO I CAN LIMIT WHERE I TEST IT ON REDCAP PROD
         try {
-            // List of pages to exclude UI injection
-            $exclusion_list = $this->getSystemSetting("chatbot_exclude_list");
+            // List of pages to include UI injection (temporarily using the exclusion list setting)
+            $exclusion_list = $this->getSystemSetting("chatbot_exclude_list"); // TODO: This is acting as an include list for now
             $excludedPages = array_map('trim', explode(",", $exclusion_list));
 
             $currentPage = $_SERVER['SCRIPT_NAME'] ?? '';
 
-            // Inject UI unless the current page is in the exclusion list
+            // Inject UI only if the current page is in the "include" list (reusing exclusion logic)
+            $inject = false; // Temporary repurpose
             foreach ($excludedPages as $excludedPage) {
                 if (strpos($currentPage, $excludedPage) !== false) {
-                    return; // Stop execution if the page is excluded
+                    $inject = true; // Mark for injection if included
+                    break;
                 }
+            }
+
+            if (!$inject) {
+                return; // Stop execution if the page is not in the "include" list
             }
 
             // Inject the UI
@@ -50,7 +79,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             \REDCap::logEvent('Exception injecting chatbot UI.', $e->getMessage());
         }
     }
-
 
     public function injectJSMO($data = null, $init_method = null): void {
         echo $this->initializeJavascriptModuleObject();
@@ -503,7 +531,5 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $this->setSystemSetting('last_cron_run', date("Y-m-d H:i:s"));
         }
     }
-
-
 }
 ?>
