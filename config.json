@@ -26,7 +26,9 @@
     "enable-every-page-hooks-on-system-pages": true,
 
     "links": {
-        "control-center": []
+        "control-center": [
+
+        ]
     },
 
     "no-auth-pages": [],
@@ -55,6 +57,18 @@
             "name": "Comma delimited list of URL fragments to exclude Cappy",
             "required": false,
             "type": "textarea"
+        },
+        {
+            "key": "rag_atlassian_api",
+            "name": "Atlassian API Key - enable integration with Atlassian services",
+            "required": false,
+            "type": "text"
+        },
+        {
+            "key": "rag_emtracking_pid",
+            "name": "EM Tracking PID - 16000 on PROD",
+            "required": false,
+            "type": "text"
         },
         {
             "key": "enable-system-debug-logging",

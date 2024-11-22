@@ -318,6 +318,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 //FIND AND INJECT RAG TOO
                 $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
                 $ragContext = $this->getRedcapRAGInstance()?->getRelevantDocuments($projectIdentifier, $messages) ?? [];
+
                 foreach ($ragContext as $doc) {
                     $messages = $this->appendSystemContext($messages, self::RAG_CONTEXT_PREFIX . $doc['content']);
                 }
@@ -397,7 +398,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     public function dailyCronRun() {
         try {
             $urls = array(
-                 $this->getUrl('cron/check_rssd_completions.php', true, true)
+                 $this->getUrl('cron/check_em_project.php', true, true)
+                ,$this->getUrl('cron/check_rssd_completions.php', true, true)
                 ,$this->getUrl('cron/check_community_portal.php', true, true)
                 ,$this->getUrl('cron/check_med_wiki.php', true, true)
             ); //has to be page
@@ -422,11 +424,12 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      */
     private function checkRSSDCompletions() {
         return;
-
+        $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
         // Implement RSSD completions check logic here
+        // MY Atlassian API, TODO ADD EM Setting for this
         $title = "RSSD Completion Data";
         $content = "Example content from RSSD"; // Replace with actual fetched content
-        $this->getRedcapRAGInstance()->storeDocument($title, $content);
+        $this->getRedcapRAGInstance()->storeDocument($projectIdentifier, $title, $content);
     }
 
     /**
@@ -434,11 +437,11 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      */
     private function checkCommunityPortal() {
         return;
-
+        $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
         // Implement Community Portal check logic here
         $title = "Community Portal Updates";
         $content = "Example content from the Community Portal"; // Replace with actual fetched content
-        $this->getRedcapRAGInstance()->storeDocument($title, $content);
+        $this->getRedcapRAGInstance()->storeDocument($projectIdentifier, $title, $content);
     }
 
     /**
@@ -446,11 +449,61 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      */
     private function checkMedWiki() {
         return;
-
+        $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
         // Implement MedWiki check logic here
         $title = "MedWiki Updates";
         $content = "Example content from MedWiki"; // Replace with actual fetched content
-        $this->getRedcapRAGInstance()->storeDocument($title, $content);
+        $this->getRedcapRAGInstance()->storeDocument($projectIdentifier, $title, $content);
     }
+
+    public function checkEMProject($catchAll = false) {
+        $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
+
+        // Get last cron run timestamp or fallback to 24 hours ago
+        $lastCronRun = $catchAll ? null : ($this->getSystemSetting('last_cron_run') ?? date("Y-m-d H:i:s", strtotime("-1 day")));
+
+        // Fetch all data from the project
+        $projectId = $this->getSystemSetting('rag_emtracking_pid');
+        $fields = ['module_name', 'module_display_name', 'module_description', 'maintenance_fee', 'actual_monthly_cost', 'date_created'];
+        $records = REDCap::getData([
+            'project_id' => $projectId,
+            'return_format' => 'array',
+            'fields' => $fields,
+            'events' => ['modules_arm_1']
+        ]);
+
+        foreach ($records as $recordId => $nested) {
+            $fields = current($nested);
+
+            // Skip records without a description
+            if (empty($fields) || empty(trim($fields['module_description']))) {
+                continue;
+            }
+
+            // If not in catch-all mode, skip records older than $lastCronRun
+            $dateCreated = $fields['date_created'] ?? null;
+            if (!$catchAll && $dateCreated && $dateCreated <= $lastCronRun) {
+                continue; // Skip older records
+            }
+
+            $module_name = $fields['module_name'];
+            $module_display_name = empty(trim($fields['module_display_name'])) ? $module_name : $fields['module_display_name'];
+            $module_description = trim($fields['module_description']);
+
+            $maintenanceFee = !empty($fields['maintenance_fee']) && $fields['maintenance_fee'] !== '0';
+            $content = "Module Name: {$module_display_name}\nDescription: {$module_description}\n"
+                . "Maintenance Fee: " . ($maintenanceFee ? "Yes" : "No") . "\nMonthly Cost: {$fields['actual_monthly_cost']}";
+
+            // Call the checkAndStoreDocument method from the RAG instance
+            $this->getRedcapRAGInstance()?->checkAndStoreDocument($projectIdentifier, $module_name, $content, $dateCreated);
+        }
+
+        // Update last cron run timestamp if not in catch-all mode
+        if (!$catchAll) {
+            $this->setSystemSetting('last_cron_run', date("Y-m-d H:i:s"));
+        }
+    }
+
+
 }
 ?>
