@@ -28,11 +28,30 @@
     "links": {
         "control-center": [
             {
-                "name": "Run EM Project Check Cron (all time)",
+                "name": "Cappy/RAG : EM Project Check (all time)",
                 "icon": "fas fa-info-circle",
                 "url" : "cron/check_em_project.php",
                 "show-header-and-footer": false
+            },
+            {
+                "name": "Cappy/RAG : Current JQL",
+                "icon": "fas fa-info-circle",
+                "url" : "cron/check_rssd_completions.php",
+                "show-header-and-footer": false
+            },
+            {
+                "name": "Cappy/RAG : MedWiki Scrape (all time)",
+                "icon": "fas fa-info-circle",
+                "url" : "cron/check_med_wiki.php",
+                "show-header-and-footer": false
+            },
+            {
+                "name": "Cappy/RAG : Community Portal Scrape (all time)",
+                "icon": "fas fa-info-circle",
+                "url" : "cron/check_community_portal.php",
+                "show-header-and-footer": false
             }
+
         ]
     },
 
@@ -64,16 +83,34 @@
             "type": "textarea"
         },
         {
+            "key": "rag_emtracking_pid",
+            "name": "EM Tracking PID - 16000 on PROD",
+            "required": false,
+            "type": "text"
+        },
+        {
             "key": "rag_atlassian_api",
             "name": "Atlassian API Key - enable integration with Atlassian services",
             "required": false,
             "type": "text"
         },
         {
-            "key": "rag_emtracking_pid",
-            "name": "EM Tracking PID - 16000 on PROD",
+            "key": "rag_atlassian_baseurl",
+            "name": "Atlassian Base URL - JIRA workspace URL",
             "required": false,
             "type": "text"
+        },
+        {
+            "key": "rag_atlassian_email",
+            "name": "Atlassian Account - Atlassian Email",
+            "required": false,
+            "type": "text"
+        },
+        {
+            "key": "rag_atlassian_jql",
+            "name": "Atlassian JQL - ticket filter query",
+            "required": false,
+            "type": "textarea"
         },
         {
             "key": "enable-system-debug-logging",

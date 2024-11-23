@@ -455,22 +455,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     /**
-     * Checks for completions in the RSSD system and updates the context database.
-     */
-    private function checkRSSDCompletions() {
-        return;
-        $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
-        // Implement RSSD completions check logic here
-        // MY Atlassian API, TODO ADD EM Setting for this
-        $title = "RSSD Completion Data";
-        $content = "Example content from RSSD"; // Replace with actual fetched content
-        $this->getRedcapRAGInstance()->storeDocument($projectIdentifier, $title, $content);
-    }
-
-    /**
      * Checks updates from the Community Portal and updates the context database.
      */
-    private function checkCommunityPortal() {
+    public function checkCommunityPortal($cron = false) {
         return;
         $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
         // Implement Community Portal check logic here
@@ -482,13 +469,135 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     /**
      * Checks updates from the MedWiki system and updates the context database.
      */
-    private function checkMedWiki() {
+    public function checkMedWiki($cron = false) {
         return;
+
+
+
         $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
         // Implement MedWiki check logic here
         $title = "MedWiki Updates";
         $content = "Example content from MedWiki"; // Replace with actual fetched content
         $this->getRedcapRAGInstance()->storeDocument($projectIdentifier, $title, $content);
+    }
+
+    /**
+     * Checks for completions in the RSSD system and updates the context database.
+     */
+    public function checkRSSDCompletions($cron = false) {
+        $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
+
+        // Get API Key and other settings from EM System Settings
+        $apiKey = $this->getSystemSetting('rag_atlassian_api');
+        $jiraBaseURL = $this->getSystemSetting('rag_atlassian_baseurl');
+        $email = $this->getSystemSetting('rag_atlassian_email');
+        $jql = urlencode($this->getSystemSetting('rag_atlassian_jql'));
+
+        if (empty($apiKey) || empty($jiraBaseURL) || empty($email)) {
+            $this->emError("Missing necessary Atlassian system settings.");
+            return;
+        }
+
+        try {
+            $client = new \GuzzleHttp\Client();
+            $startAt = 0;
+            $maxResults = 50; // You can adjust this as needed
+            $total = 0;
+
+            do {
+                $response = $client->request('GET', "$jiraBaseURL/rest/api/3/search?jql=$jql&fields=summary,description,comment,created&startAt=$startAt&maxResults=$maxResults", [
+                    'auth' => [$email, $apiKey],
+                ]);
+
+                // Parse Jira API Response
+                $tickets = json_decode($response->getBody(), true);
+                $total = $tickets['total']; // Total number of tickets for the query
+
+                if (empty($tickets['issues'])) {
+                    $this->emLog("No tickets found for the specified JQL.");
+                    break;
+                }
+
+                foreach ($tickets['issues'] as $ticket) {
+                    $key = $ticket['key'];
+                    $fields = $ticket['fields'];
+
+                    // Filter out automatic or irrelevant tickets
+                    if (stripos($fields['summary'], 'API token') !== false ||
+                        stripos($fields['summary'], 'account reactivation') !== false ||
+                        stripos($fields['description']['content'][0]['content'][0]['text'] ?? '', 'automatically generated') !== false) {
+                        $this->emLog("Skipping irrelevant ticket: $key");
+                        continue;
+                    }
+
+                    // Rehydrate the description into plain text
+                    $description = $this->rehydrateContent($fields['description']);
+                    $comments = !empty($fields['comment']['comments']) ? $this->rehydrateComments($fields['comment']['comments']) : '';
+
+                    // Combine description and comments
+                    $content = "Description:\n$description\n\nComments:\n$comments";
+
+                    if (empty(trim($content))) {
+                        $this->emLog("Skipping ticket with no meaningful content: $key");
+                        continue;
+                    }
+                    $title = "Ticket: $key";
+                    $dateCreated = $fields['created'];
+
+                    // Store the document in RAG
+                    $this->getRedcapRAGInstance()?->storeDocument($projectIdentifier, $title, $content, $dateCreated);
+                    $this->emLog("Stored ticket $key in RAG.");
+                }
+
+                // Increment startAt for the next page
+                $startAt += $maxResults;
+
+            } while ($startAt < $total); // Continue until all tickets are fetched
+        } catch (\Exception $e) {
+            $this->emError("Failed to fetch or process RSSD completions from Atlassian: " . $e->getMessage());
+        }
+    }
+
+
+    /**
+     * Rehydrate structured content into plain text.
+     */
+    private function rehydrateContent($content) {
+        if (!isset($content['content']) || !is_array($content['content'])) {
+            return '';
+        }
+
+        $text = '';
+        foreach ($content['content'] as $block) {
+            if (isset($block['type']) && $block['type'] === 'paragraph' && isset($block['content'])) {
+                foreach ($block['content'] as $line) {
+                    if (isset($line['text'])) {
+                        $text .= $line['text'];
+                    }
+                    if (isset($line['type']) && $line['type'] === 'hardBreak') {
+                        $text .= "\n";
+                    }
+                }
+                $text .= "\n";
+            }
+        }
+
+        return trim($text);
+    }
+
+    /**
+     * Rehydrate Jira comments into plain text (exclude author names).
+     */
+    private function rehydrateComments($comments) {
+        $text = '';
+        foreach ($comments as $comment) {
+            $created = $comment['created'] ?? '';
+            $body = $this->rehydrateContent($comment['body'] ?? []);
+
+            $text .= "Comment on $created:\n$body\n---\n";
+        }
+
+        return trim($text);
     }
 
     public function checkEMProject($cron = false) {
@@ -538,6 +647,5 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $this->setSystemSetting('last_cron_run', date("Y-m-d H:i:s"));
         }
     }
-
 }
 ?>
