@@ -5,6 +5,7 @@ require 'vendor/autoload.php';
 require_once "emLoggerTrait.php";
 use REDCap;
 use Project;
+use Goutte\Client;
 
 class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
@@ -156,12 +157,22 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     public function formatResponse($response) {
-        $content = $this->getSecureChatInstance()->extractResponseText($response);
-        $role = $response['choices'][0]['message']['role'] ?? 'assistant';
+        // Check if the response is normalized (has `content`)
+        if (isset($response['content'])) {
+            $content = $response['content'];
+            $role = $response['role'] ?? 'assistant';
+        } else {
+            // Handle raw responses (e.g., GPT-4o, Ada-002 pass-through)
+            $content = $this->getSecureChatInstance()->extractResponseText($response);
+            $role = $response['choices'][0]['message']['role'] ?? 'assistant';
+        }
+
+        // Common fields
         $id = $response['id'] ?? null;
         $model = $response['model'] ?? null;
         $usage = $response['usage'] ?? null;
 
+        // Return in required structure
         $formattedResponse = [
             'response' => [
                 'role' => $role,
@@ -171,7 +182,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             'model' => $model,
             'usage' => $usage
         ];
-
         return $formattedResponse;
     }
 
@@ -191,7 +201,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
         return $chatMlArray;
     }
-
 
     /**
      * Retrieves and formats the current REDCap project's metadata for chatbot context injection.
@@ -315,7 +324,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
 
-
     public function redcap_module_ajax($action, $payload, $project_id=null, $record, $instrument, $event_id, $repeat_instance,
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
         switch ($action) {
@@ -353,15 +361,16 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 //FIND AND INJECT RAG TOO
                 $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
                 $ragContext = $this->getRedcapRAGInstance()?->getRelevantDocuments($projectIdentifier, $messages) ?? [];
-
                 foreach ($ragContext as $doc) {
+                    // $this->emDebug("oh yay i got some rag!", $doc['content']);
                     $messages = $this->appendSystemContext($messages, self::RAG_CONTEXT_PREFIX . $doc['content']);
                 }
 
-                //$this->emDebug("initial general system context and project Metadata and RAG", $messages);
+                // $this->emDebug("initial general system context and project Metadata and RAG", $messages);
 
                 //CALL API ENDPOINT WITH AUGMENTED CHATML
-                $response = $this->getSecureChatInstance()->callAI("gpt-4o", array("messages" => $messages));
+                $model = $this->getSystemSetting("llm-model");
+                $response = $this->getSecureChatInstance()->callAI($model, array("messages" => $messages));
                 $result = $this->formatResponse($response);
 
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
@@ -371,6 +380,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 throw new Exception("Action $action is not defined");
         }
     }
+
 
     /**
      * @return \Stanford\SecureChatAI\SecureChatAI
@@ -394,6 +404,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         $this->secureChatInstance = $secureChatInstance;
     }
 
+
     /**
      * Get the RedcapRAG module instance if available.
      *
@@ -416,8 +427,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $this->redcapRAGInstance ?? null;
     }
 
-
-
     /**
      * @param \Stanford\RedcapRAG\RedcapRAG $redcapRAGInstance
      */
@@ -435,8 +444,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $urls = array(
                  $this->getUrl('cron/check_em_project.php?cron=true', true, true)
                 ,$this->getUrl('cron/check_rssd_completions.php?cron=true', true, true)
-                ,$this->getUrl('cron/check_community_portal.php?cron=true', true, true)
-                ,$this->getUrl('cron/check_med_wiki.php?cron=true', true, true)
+//                ,$this->getUrl('cron/check_community_portal.php?cron=true', true, true)
+//                ,$this->getUrl('cron/check_med_wiki.php?cron=true', true, true)
             ); //has to be page
 
             foreach ($urls as $url) {
@@ -470,15 +479,80 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      * Checks updates from the MedWiki system and updates the context database.
      */
     public function checkMedWiki($cron = false) {
-        return;
-
-
-
         $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
-        // Implement MedWiki check logic here
-        $title = "MedWiki Updates";
-        $content = "Example content from MedWiki"; // Replace with actual fetched content
-        $this->getRedcapRAGInstance()->storeDocument($projectIdentifier, $title, $content);
+
+        // File containing the HTML to parse
+        $filePath = $this->getModulePath() . '/cron/rssd.txt';
+
+        if (!file_exists($filePath)) {
+            $this->emError("File rssd.txt not found in the specified directory. $filePath", $this->getModulePath());
+            return;
+        }
+
+        try {
+            // Load the HTML file
+            $htmlContent = file_get_contents($filePath);
+
+            // Use Symfony DOMCrawler to parse the content
+            $crawler = new \Symfony\Component\DomCrawler\Crawler($htmlContent);
+
+            // Extract the title
+            $title = $crawler->filter('#title-text a')->text();
+
+            // Extract and format the main content
+            $mainContentNode = $crawler->filter('#main-content');
+            $formattedContent = "";
+
+            // Process the content in the order of appearance
+            $mainContentNode->children()->each(function ($node) use (&$formattedContent) {
+                if ($node->nodeName() === 'h2' || $node->nodeName() === 'h3') {
+                    $formattedContent .= "## " . $node->text() . "\n\n";
+                } elseif ($node->nodeName() === 'p') {
+                    $formattedContent .= $node->text() . "\n\n";
+                } elseif ($node->nodeName() === 'ul' || $node->nodeName() === 'ol') {
+                    $node->filter('li')->each(function ($listItem) use (&$formattedContent) {
+                        $formattedContent .= "- " . $listItem->text() . "\n";
+                    });
+                    $formattedContent .= "\n";
+                }
+            });
+
+            // Extract images and their alt attributes
+            $images = $mainContentNode->filter('img')->each(function ($node) {
+                return [
+                    'src' => $node->attr('src'),
+                    'alt' => $node->attr('alt'),
+                ];
+            });
+
+            // Add images to the content
+            if (!empty($images)) {
+                $formattedContent .= "Images:\n";
+                foreach ($images as $image) {
+                    $formattedContent .= "- " . ($image['alt'] ?: 'No Alt Text') . " (" . $image['src'] . ")\n";
+                }
+                $formattedContent .= "\n";
+            }
+
+            // Placeholder: Filter by date for cron runs
+            if ($cron) {
+                // TODO: Add logic to fetch only new/updated articles within the last 24 hours.
+            } else {
+                // TODO: Logic to fetch all available content for manual runs.
+            }
+
+            echo "<pre>";
+            print_r($title);
+            print_r($formattedContent);
+            echo "</pre>";
+
+            // Store the document in the context database
+            //$this->getRedcapRAGInstance()->storeDocument($projectIdentifier, $title, $formattedContent);
+            $this->emLog("Stored MedWiki content: $title");
+
+        } catch (\Exception $e) {
+            $this->emError("Failed to fetch MedWiki updates: " . $e->getMessage());
+        }
     }
 
     /**
@@ -557,7 +631,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $this->emError("Failed to fetch or process RSSD completions from Atlassian: " . $e->getMessage());
         }
     }
-
 
     /**
      * Rehydrate structured content into plain text.

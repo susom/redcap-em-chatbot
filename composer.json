@@ -1,5 +1,6 @@
 {
     "require": {
-        "php-ai/php-ml": "^0.10.0"
+        "php-ai/php-ml": "^0.10.0",
+        "fabpot/goutte": "^4.0"
     }
 }
