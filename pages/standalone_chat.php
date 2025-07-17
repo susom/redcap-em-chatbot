@@ -50,5 +50,8 @@ $build_files    = $module->generateAssetFiles();
 </head>
 <body>
     <div id="chatbot_ui_container"></div>
+<script>
+window.parent.postMessage("cappy-loaded", "*");
+</script>
 </body>
 </html>
