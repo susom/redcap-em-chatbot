@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import { ChatContextProvider } from './contexts/Chat';
@@ -6,10 +6,33 @@ import App from './App';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
 
+const projectContextRef = { current: null }; // Mutable ref-like object
+const ALLOWED_CONTEXT_TYPES = window.cappy_project_config?.allowed_context_types;
+
+// Listen for postMessage at the global/window level
+window.addEventListener('message', (event) => {
+  console.log("message received?" , ALLOWED_CONTEXT_TYPES, event.data.type);
+
+  if (!event.data || !event.data.type) return;
+  if (ALLOWED_CONTEXT_TYPES.includes(event.data.type)) {
+    const summary = Object.entries(event.data.projectContext)
+    .map(([k, v]) => {
+      if (typeof v === "object") {
+        return `${k}: ${JSON.stringify(v, null, 2)}`;
+      } else {
+        return `${k}: ${v}`;
+      }
+    })
+    .join('\n');
+
+    projectContextRef.current = summary;
+  }
+});
+
 const root = ReactDOM.createRoot(document.getElementById('chatbot_ui_container'));
 root.render(
   <React.StrictMode>
-      <ChatContextProvider>
+      <ChatContextProvider projectContextRef={projectContextRef}>
           <App />
       </ChatContextProvider>
   </React.StrictMode>

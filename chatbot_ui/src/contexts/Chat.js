@@ -3,7 +3,7 @@ import { saveNewSession, updateSession, getSession, deleteSession } from '../com
 
 export const ChatContext = createContext();
 
-export const ChatContextProvider = ({ children }) => {
+export const ChatContextProvider = ({ children , projectContextRef}) => {
     const [apiContext, setApiContext] = useState([]);
     const [chatContext, setChatContext] = useState([]);
     const [showRatingPO, setShowRatingPO] = useState(false);
@@ -13,6 +13,8 @@ export const ChatContextProvider = ({ children }) => {
 
     const apiContextRef = useRef(apiContext);
     const chatContextRef = useRef(chatContext);
+
+    const DYNAMIC_CONTEXT_LABEL = "Active Project Context";
 
     useEffect(() => {
         console.log("apiContext updated: ", apiContext);
@@ -44,26 +46,48 @@ export const ChatContextProvider = ({ children }) => {
     };
 
     const addMessage = (message) => {
-        const index = chatContextRef.current.length;
-        const updatedApiContext = [
-            ...apiContextRef.current,
-            { role: message.role, content: message.content, index },
-        ];
-        updateApiContext(updatedApiContext);
-
-        if(message.role == "system"){
+        let updatedApiContext;
+    
+        // If system context
+        if (message.role === "system" && message.content.startsWith(DYNAMIC_CONTEXT_LABEL)) {
+            // Remove any previous system context, keep user/assistant turns
+            updatedApiContext = apiContextRef.current.filter(
+                entry => !(entry.role === "system" && entry.content.startsWith(DYNAMIC_CONTEXT_LABEL))
+            );
+            // Insert new system context at the top
+            updatedApiContext = [{ role: "system", content: message.content, index: 0 }, ...updatedApiContext];
+            updateApiContext(updatedApiContext);
             return;
         }
-
-        const newChatContext = [
-            ...chatContextRef.current,
-            {
-                user_content: message.role === 'user' ? message.content : null,
-                assistant_content: message.role === 'assistant' ? message.content : null,
-                timestamp: new Date().getTime(),
-            },
+    
+        // Otherwise, add the message after the system context (if present)
+        const systemContext = apiContextRef.current.find(
+            entry => entry.role === "system" && entry.content.startsWith(DYNAMIC_CONTEXT_LABEL)
+        );
+        const userAssistantTurns = apiContextRef.current.filter(
+            entry => !(entry.role === "system" && entry.content.startsWith(DYNAMIC_CONTEXT_LABEL))
+        );
+    
+        // Append new turn
+        updatedApiContext = [
+            ...(systemContext ? [systemContext] : []),
+            ...userAssistantTurns,
+            { role: message.role, content: message.content, index: userAssistantTurns.length },
         ];
-        updateChatContext(newChatContext);
+        updateApiContext(updatedApiContext);
+    
+        // Only update chatContext for user/assistant, not system messages
+        if (message.role === "user" || message.role === "assistant") {
+            const newChatContext = [
+                ...chatContextRef.current,
+                {
+                    user_content: message.role === 'user' ? message.content : null,
+                    assistant_content: message.role === 'assistant' ? message.content : null,
+                    timestamp: new Date().getTime(),
+                },
+            ];
+            updateChatContext(newChatContext);
+        }
     };
 
     const updateMessage = async (response, index) => {
@@ -121,6 +145,11 @@ export const ChatContextProvider = ({ children }) => {
             // You can decide to proceed without it or handle this case as needed.
         }
 
+        // Inject project context system message if present
+        if (projectContextRef && projectContextRef.current) {
+            addMessage({ role: "system", content: DYNAMIC_CONTEXT_LABEL + ":\n" + projectContextRef.current });
+        }
+        
         addMessage({ role: 'user', content: payload.content });
 
         const userMessageIndex = chatContextRef.current.length - 1;

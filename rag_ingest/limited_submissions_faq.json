@@ -1,0 +1,65 @@
+{
+    "id": "limited_submissions_faq",
+    "source_url": "https://doresearch.stanford.edu/tool/limited-submission-faqs",
+    "title": "Limited Submissions FAQs",
+    "content_type": "webpage",
+    "scraped_at": "2025-07-15T20:05:00Z",
+    "content": {
+      "structured_sections": [
+        {
+          "heading": "What is a Limited Submission Program?",
+          "content": "A Limited Submission Program is a funding opportunity where the sponsor restricts the number of applications or nominations that Stanford University can submit. Because of this institutional limit, an internal selection process is required to determine which proposal(s) will be submitted on behalf of the university.",
+          "level": 1
+        },
+        {
+          "heading": "Internal Selection Process",
+          "content": "The Office of the Vice Provost and Dean of Research (VPDoR) manages the internal selection process for university-wide limited submission programs. This involves announcing the opportunities, coordinating an internal review of pre-proposals by a faculty review committee, and selecting the final candidate(s). The Research Management Group (RMG) in the School of Medicine handles programs with a clinical or biomedical focus.",
+          "level": 1
+        },
+        {
+          "heading": "Identifying a Limited Submission Opportunity",
+          "content": "To determine if a funding opportunity is a limited submission, look for specific language in the solicitation, such as 'number of applications per institution is limited,' 'an institution may submit only one application,' or 'submissions are limited to one per institution.' If you are unsure, you can contact the Limited Submissions team at limitedsubmissions@stanford.edu.",
+          "level": 2
+        },
+        {
+          "heading": "Finding Limited Submission Opportunities",
+          "content": "The VPDoR office identifies and announces limited submission opportunities through several channels: the DoResearch website's funding opportunities page, the Research and Scholarship newsletter, and direct emails to relevant mailing lists. Faculty can also identify opportunities and should notify the Limited Submissions team if they find one not already on the internal list.",
+          "level": 2
+        },
+        {
+          "heading": "Internal Application Process",
+          "content": "Faculty who wish to be considered must submit an internal pre-proposal by the internal deadline posted on the funding opportunity announcement. The pre-proposal typically includes a cover page, a project summary, a CV or biosketch, and other required documents. A faculty review committee evaluates these pre-proposals and recommends candidates to the Vice Provost and Dean of Research for final selection.",
+          "level": 2
+        },
+        {
+          "heading": "If You Miss the Internal Deadline",
+          "content": "If the internal deadline has passed, you should contact the Limited Submissions team. If no applications were received, the opportunity may be opened on a first-come, first-served basis. If a candidate has already been selected, you cannot submit a proposal for that cycle.",
+          "level": 2
+        },
+        {
+          "heading": "After Selection",
+          "content": "Once a PI is selected as the institutional nominee, they must notify the Limited Submissions team of their decision to proceed. They are then responsible for preparing and submitting the full proposal to the sponsoring agency by the external deadline. A copy of the VPDoR selection letter must be included with the PDRF when it is routed for institutional approval.",
+          "level": 2
+        }
+      ],
+      "tables": [],
+      "links": []
+    },
+    "metadata": {
+      "word_count": 486,
+      "section_count": 7,
+      "table_count": 0,
+      "link_count": 0,
+      "parent_url": "https://ora.stanford.edu/initiate-a-new-pdrf",
+      "topics": [
+        "Limited Submissions",
+        "Funding Opportunities",
+        "VPDoR",
+        "Internal Selection",
+        "Pre-proposal",
+        "Sponsored Projects",
+        "PDRF"
+      ]
+    }
+  }
+  

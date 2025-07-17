@@ -26,6 +26,14 @@
     "enable-every-page-hooks-on-system-pages": true,
 
     "links": {
+        "project": [
+            {
+                "name": "Cappy Chatbot",
+                "icon": "comments",
+                "url": "pages/standalone_chat.php",
+                "show-header-and-footer": false
+            }
+        ],
         "control-center": [
             {
                 "name": "Cappy/RAG : EM Project Check (all time)",
@@ -63,6 +71,144 @@
 
     "no-auth-ajax-actions": [],
 
+    "project-settings": [
+        {
+            "key": "enable-project-debug-logging",
+            "name": "<b>Enable Debug Logging</b><br><i>(optional)</i> Requires installation and configuration of emLogger",
+            "required": false,
+            "type": "checkbox"
+        },
+        {
+            "key": "project_chatbot_title",
+            "name": "Project Chatbot Title",
+            "required": false,
+            "type": "text"
+        },
+        {
+            "key": "project_rag_project_identifier",
+            "name": "RAG Scope identifier",
+            "required": false,
+            "type": "text"
+        },
+        {
+            "key": "project_chatbot_intro",
+            "name": "Chat Intro Messaging",
+            "required": false,
+            "type": "text"
+        },
+        {
+            "key": "project_allowed_context_types",
+            "name": "Allowed postMessage event types for Dynamic context injection (comma separated)",
+            "required": false,
+            "type": "textarea"
+        },
+        {
+            "key": "project_chatbot_system_context",
+            "name": "Raw text to inject into system context for Cappy",
+            "required": false,
+            "type": "textarea"
+        },
+        {
+            "key": "project_chatbot_custom_css",
+            "name": "Custom CSS for Standalone Chatbot",
+            "required": false,
+            "type": "textarea"
+        },
+        {
+            "key": "project-llm-model",
+            "name": "LLM Model",
+            "required": false,
+            "type": "dropdown",
+            "choices": [
+                {
+                    "value": "gpt-4o",
+                    "name": "GPT-4o"
+                },
+                {
+                    "value": "gpt-4.1",
+                    "name": "GPT-4.1"
+                },
+                {
+                    "value": "o1",
+                    "name": "GPT-o1"
+                },
+                {
+                    "value": "o3-mini",
+                    "name": "GPT-o3-mini"
+                },
+                {
+                    "value": "claude",
+                    "name": "Claude 3.7 Sonnet"
+                },
+                {
+                    "value": "gemini20flash",
+                    "name": "Gemini 2.0 Flash"
+                },
+                {
+                    "value": "llama-Maverick",
+                    "name": "Llama 4 Maverick"
+                }
+            ],
+            "default": "gpt-4o"
+        },
+        {
+            "key": "project-gpt-temperature",
+            "name": "GPT Temperature",
+            "required": false,
+            "type": "number",
+            "default": 0.7
+        },
+        {
+            "key": "project-gpt-top-p",
+            "name": "GPT Top P",
+            "required": false,
+            "type": "number",
+            "default": 0.9
+        },
+        {
+            "key": "project-gpt-frequency-penalty",
+            "name": "GPT Frequency Penalty",
+            "required": false,
+            "type": "number",
+            "default": 0.5
+        },
+        {
+            "key": "project-gpt-presence-penalty",
+            "name": "GPT Presence Penalty",
+            "required": false,
+            "type": "number",
+            "default": 0
+        },
+        {
+            "key": "project-gpt-max-tokens",
+            "name": "GPT Max Tokens",
+            "required": false,
+            "type": "number",
+            "default": 800
+        },
+        {
+            "key": "project-reasoning-effort",
+            "name": "<b>Reasoning Effort</b>  <br>(only applicable to o1, o3-mini reasoning models)",
+            "required": false,
+            "type": "dropdown",
+            "choices": [
+                {
+                    "value": "low",
+                    "name": "low"
+                },
+                {
+                    "value": "medium",
+                    "name": "medium"
+                },
+                {
+                    "value": "high",
+                    "name": "high"
+                }
+            ],
+            "default": "medium"
+        }
+    ],
+
     "system-settings": [
         {
             "key": "llm-model",
@@ -75,12 +221,28 @@
                     "name": "GPT-4o"
                 },
                 {
-                    "value": "claude",
-                    "name": "Claude 3.5 Sonnet"
+                    "value": "gpt-4.1",
+                    "name": "GPT-4.1"
                 },
                 {
-                    "value": "o1-mini",
-                    "name": "GPT o1-mini"
+                    "value": "o1",
+                    "name": "GPT-o1"
+                },
+                {
+                    "value": "o3-mini",
+                    "name": "GPT-o3-mini"
+                },
+                {
+                    "value": "claude",
+                    "name": "Claude 3.7 Sonnet"
+                },
+                {
+                    "value": "gemini20flash",
+                    "name": "Gemini 2.0 Flash"
+                },
+                {
+                    "value": "llama-Maverick",
+                    "name": "Llama 4 Maverick"
                 }
             ],
             "default": "gpt-4o"

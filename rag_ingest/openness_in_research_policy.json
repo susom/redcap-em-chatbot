@@ -1,0 +1,83 @@
+{
+    "id": "openness_in_research_policy",
+    "source_url": "https://doresearch.stanford.edu/policies/research-policy-handbook/conduct-research/openness-research",
+    "title": "RPH 1.4: Openness in Research",
+    "content_type": "webpage",
+    "scraped_at": "2025-07-15T19:30:00Z",
+    "content": {
+      "structured_sections": [
+        {
+          "heading": "The Principle of Openness in Research",
+          "content": "Stanford University's policy on Openness in Research emphasizes the freedom of access by all interested persons to the underlying data, processes, and final results of research. The university prohibits any research program that requires secrecy, subject to specific provisions outlined in the policy.",
+          "level": 1
+        },
+        {
+          "heading": "Definition of Secrecy",
+          "content": "A research program is considered to require secrecy if: 1) Any part of the sponsoring documents is not freely publishable. 2) There is a reasonable expectation that research documents will be restricted from publication for more than 90 days (beyond what is needed for a sponsor to review for confidential information). 3) Access to confidential data is so central that a team member without access cannot fully participate in the intellectually significant parts of the project.",
+          "level": 2
+        },
+        {
+          "heading": "Rules Regarding Theses and Dissertations",
+          "content": "The Academic Council has established rules stating that no research for a thesis or dissertation should be undertaken if there is a possibility it will lead to a secret thesis. Secret theses or dissertations are not accepted for degrees, and secret scholarly activities are not considered for appointments or promotions.",
+          "level": 2
+        },
+        {
+          "heading": "Allowable Provisions and Exceptions",
+          "content": "The policy allows for certain provisions that might otherwise be considered restrictions on openness. These are permitted to protect individual privacy, national security, and intellectual property rights, under specific conditions.",
+          "level": 1
+        },
+        {
+          "heading": "Protection of Human Subjects",
+          "content": "Reasonable provisions may be made to protect the privacy rights of living human beings involved in research.",
+          "level": 2
+        },
+        {
+          "heading": "National Security Controls",
+          "content": "Access to information under national security controls is permissible if the information is peripheral to the research, meaning a team member without access can still fully participate in the project's intellectually significant portions, and there is no expectation that the final results will be subject to publication restrictions.",
+          "level": 2
+        },
+        {
+          "heading": "Publication Delays",
+          "content": "Short delays in publication (not to exceed 90 days) are allowable for patenting purposes or sponsor review, provided there's no expectation of suppression or substantive changes. For multi-site clinical research, a longer delay (up to 24 months) is permissible if the Stanford investigator is assured the ability to publish without restriction after the delay. The Vice Provost and Dean of Research may approve longer delays in special circumstances, but students or trainees should not be engaged in projects with extended publication delays that could hinder their thesis or career progression.",
+          "level": 2
+        },
+        {
+          "heading": "Confidentiality of Supplied Information",
+          "content": "If an outside entity provides confidential information, provisions can be made to preserve its confidentiality. This may include a short publication delay for the information source to review the manuscript and ensure no confidential information has been disclosed. The source cannot thwart publication for any other reason.",
+          "level": 2
+        },
+        {
+          "heading": "Private Papers and Documents",
+          "content": "Confidentiality of private papers, documents, or diaries can be preserved to protect the individual privacy of the author or addressee.",
+          "level": 2
+        },
+        {
+          "heading": "Policy Review",
+          "content": "This policy is reviewed at least annually by the Committee on Research. Meetings devoted to considering revisions of research policy are publicly announced.",
+          "level": 1
+        }
+      ],
+      "tables": [],
+      "links": []
+    },
+    "metadata": {
+      "word_count": 583,
+      "section_count": 10,
+      "table_count": 0,
+      "link_count": 0,
+      "parent_url": "https://ora.stanford.edu/initiate-a-new-pdrf",
+      "topics": [
+        "Openness in Research",
+        "Secrecy",
+        "Publication Policy",
+        "Research Policy Handbook",
+        "RPH",
+        "Confidentiality",
+        "National Security",
+        "Human Subjects",
+        "Academic Freedom"
+      ]
+    }
+  }
+
+  

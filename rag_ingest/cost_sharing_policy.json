@@ -1,0 +1,78 @@
+{
+    "id": "cost_sharing_policy",
+    "source_url": "https://doresearch.stanford.edu/policies/research-policy-handbook/financial-aspects-sponsored-projects-administration/cost-sharing-policy",
+    "title": "RPH 15.3: Cost Sharing Policy",
+    "content_type": "webpage",
+    "scraped_at": "2025-07-15T19:35:00Z",
+    "content": {
+      "structured_sections": [
+        {
+          "heading": "Definitions of Cost Sharing",
+          "content": "Cost sharing is the portion of total project costs not borne by the sponsor. It can be mandatory (required by the sponsor) or voluntary (not required, but offered in the proposal). Once an award is received with a cost-sharing commitment, it becomes a binding obligation for the university. Voluntary Uncommitted Cost Sharing refers to effort or costs contributed above what was agreed to in the award and is not tracked as a binding commitment. Matching is a form of cost sharing where the university must match sponsor funds with funds from another party.",
+          "level": 1
+        },
+        {
+          "heading": "The Cost Sharing Commitment",
+          "content": "When a PI proposes and the university agrees to cost share, it becomes a formal commitment that must be indicated on the Proposal Development Routing Form (PDRF). The PI is responsible for ensuring that voluntary cost sharing is permitted, that funds are available, and that all expenses are necessary, reasonable, and accounted for in compliance with university and sponsor requirements. The tracking and reporting of cost sharing are subject to audit.",
+          "level": 1
+        },
+        {
+          "heading": "Expenditures Eligible for Cost Sharing",
+          "content": "Cost sharing can consist of allowable direct and/or Facilities & Administrative (F&A) costs.",
+          "level": 2
+        },
+        {
+          "heading": "Eligible Direct Costs",
+          "content": "Direct costs that can be cost-shared include: 1) Faculty, student, or staff effort, including associated fringe benefits. Note that for faculty with appointments less than 12 months, summer effort above 90% (95% for Research Faculty) cannot be cost-shared. 2) Equipment, but only if the award is contingent on such cost sharing (e.g., instrumentation grants). Otherwise, equipment should be listed as 'available for the performance of the sponsored agreement.' 3) Other direct costs like travel, lab supplies, and the university's contribution to graduate student tuition.",
+          "level": 3
+        },
+        {
+          "heading": "Eligible F&A (Indirect Costs)",
+          "content": "When direct costs are cost-shared, the associated F&A costs are automatically cost-shared as well. PIs can include these automatically cost-shared F&A costs, as well as any waived F&A costs, in the proposal budget. For federal awards, including unrecovered F&A on cost sharing requires prior approval from the sponsoring agency.",
+          "level": 3
+        },
+        {
+          "heading": "Expenditures Not Eligible for Cost Sharing",
+          "content": "Certain expenses cannot be offered as cost sharing. These include: unallowable costs as defined by federal guidelines (Uniform Guidance); salary dollars above a regulatory cap (e.g., NIH); summer salary effort above the 90%/95% limit for certain faculty; and the use of university facilities or utilities, which should be characterized as 'available for performance' instead.",
+          "level": 1
+        },
+        {
+          "heading": "Source of Funds for Cost Sharing",
+          "content": "The PI is responsible for identifying the source of funds for direct cost sharing. Federal award funds cannot be used as a source for cost sharing unless authorized by statute. Non-federal award funds can be used only if allowed by both sponsors. Typically, funds come from gift, endowment income, operating budget, or other designated departmental funds.",
+          "level": 1
+        },
+        {
+          "heading": "Overdrafts and Reductions",
+          "content": "Project overdrafts are not considered cost sharing but must be charged to a cost-sharing account to be included in the university's F&A rate base. If a project's total costs decrease, the PI must consult with their institutional official (OSR, ICO, or RMG) before contacting the sponsor to determine how the reduction should be applied to the sponsor's and the university's contributions.",
+          "level": 1
+        },
+        {
+          "heading": "Reporting Cost Sharing",
+          "content": "The Office of Sponsored Research (OSR) is responsible for reporting to sponsors to demonstrate that the university has met its cost-sharing commitments. Overdrafts are not reported to sponsors as cost sharing.",
+          "level": 1
+        }
+      ],
+      "tables": [],
+      "links": []
+    },
+    "metadata": {
+      "word_count": 635,
+      "section_count": 9,
+      "table_count": 0,
+      "link_count": 0,
+      "parent_url": "https://ora.stanford.edu/initiate-a-new-pdrf",
+      "topics": [
+        "Cost Sharing",
+        "Sponsored Projects",
+        "Mandatory Cost Sharing",
+        "Voluntary Cost Sharing",
+        "PDRF",
+        "RPH",
+        "Direct Costs",
+        "Indirect Costs",
+        "F&A"
+      ]
+    }
+  }
+
+  

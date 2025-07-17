@@ -1,0 +1,67 @@
+{
+    "id": "confidentiality_agreements_policy",
+    "source_url": "https://doresearch.stanford.edu/research-scholarship/export-controls/confidentiality-agreements/",
+    "title": "Export Controls: Confidentiality Agreements",
+    "content_type": "webpage",
+    "scraped_at": "2025-07-15T20:15:00Z",
+    "content": {
+      "structured_sections": [
+        {
+          "heading": "The Basics of Confidentiality Agreements",
+          "content": "When Stanford researchers accept confidential or restricted information, materials, or software from an external party, they are often required to sign a Non-Disclosure Agreement (NDA), also known as a Confidential Disclosure Agreement (CDA) or Proprietary Information Agreement (PIA). Accepting disclosure-restricted technical data, technology, or software source code subjects the recipient to export control compliance requirements, which may necessitate an export license for transmitting the data outside the U.S. or sharing it with foreign nationals. Non-technical information (e.g., financial or clinical trial data) is not treated as export-controlled technology but generally requires a license for sharing with countries under comprehensive U.S. embargo.",
+          "level": 1
+        },
+        {
+          "heading": "Types of Agreements",
+          "content": "Confidentiality terms can appear in different types of agreements.",
+          "level": 2
+        },
+        {
+          "heading": "Institutional Agreements",
+          "content": "For institutional agreements like equipment purchases, technology licenses, or data sharing agreements, the Office of Sponsored Research (OSR) or the Industrial Contracts Office (ICO) will negotiate terms consistent with University policies and will have the exclusive authority to sign on behalf of Stanford.",
+          "level": 3
+        },
+        {
+          "heading": "Sponsor or Third Party Agreements",
+          "content": "In cases where a sponsor or third party asks an individual researcher to sign an NDA, the researcher signs as an individual, not on behalf of the University. Because these agreements often contain terms that violate Stanford policy, researchers should contact OSR, ICO, or the Research Management Group (RMG) for guidance before signing.",
+          "level": 3
+        },
+        {
+          "heading": "Consulting Work and Class Projects",
+          "content": "This guidance does not apply to consulting work, which falls outside of an individual's Stanford responsibilities. Export-controlled information from consulting work should never be brought onto campus. NDAs are generally not permitted for class projects, as companies should not provide information to classes if they are unwilling for it to be made public.",
+          "level": 1
+        },
+        {
+          "heading": "Tips for Reviewing Agreements",
+          "content": "Accepting third-party disclosure-restricted technical information creates a 'deemed export' compliance risk. The principle of Openness in Research is of overriding importance at Stanford. The sponsor is responsible for precisely identifying what information is confidential. Any limits on publication or restrictions based on nationality should be immediately questioned with the appropriate Stanford office.",
+          "level": 1
+        },
+        {
+          "heading": "Standard Templates and Other Considerations",
+          "content": "Stanford's Industrial Contracts Office provides a standard NDA template. If a sponsor agrees to use this template, it can be signed without further review. If the sponsor provides their own agreement, its terms should be compared to the Stanford template. These agreements should not contain clauses about intellectual property ownership. If an agreement references ITAR or EAR, the Export Control Office must be contacted. The researcher is the appropriate signer of the agreement; if an institutional signature is required, OSR, ICO, or RMG should be contacted.",
+          "level": 1
+        }
+      ],
+      "tables": [],
+      "links": []
+    },
+    "metadata": {
+      "word_count": 489,
+      "section_count": 7,
+      "table_count": 0,
+      "link_count": 0,
+      "parent_url": "https://ora.stanford.edu/initiate-a-new-pdrf",
+      "topics": [
+        "Export Controls",
+        "Confidentiality Agreement",
+        "NDA",
+        "CDA",
+        "Openness in Research",
+        "Deemed Export",
+        "ITAR",
+        "EAR",
+        "Compliance"
+      ]
+    }
+  }
+  

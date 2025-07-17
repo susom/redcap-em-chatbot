@@ -14,9 +14,15 @@ function App() {
     const [defaultPosition, setDefaultPosition] = useState({ x: 0, y: 0 });
     const [size, setSize] = useState({ width: 390, height: 300 }); // Default size for the UI
 
+    const isProjectContext = typeof window.cappy_project_config !== "undefined";
+
     const changeView = (viewName) => {
+        // Send resize instructions to parent
         if (viewName === 'splash') {
+            window.parent.postMessage({ type: 'resize-cappy', width: 120, height: 120 }, '*');
             setDefaultPosition({ x: 0, y: 0 });
+        } else if (viewName === 'home' || viewName === 'history') {
+            window.parent.postMessage({ type: 'resize-cappy', width: 380, height: 600 }, '*');
         }
         setCurrentView(viewName);
     };
@@ -26,6 +32,16 @@ function App() {
             setDefaultPosition({ x: 0, y: 0 });
         }
     }, [currentView]);
+
+    useEffect(() => {
+        const handler = (event) => {
+            if (event.data && event.data.type === 'collapse-cappy') {
+            changeView('splash');
+            }
+        };
+        window.addEventListener('message', handler);
+        return () => window.removeEventListener('message', handler);
+    }, []);
 
     let ViewComponent;
     switch (currentView) {
@@ -40,32 +56,39 @@ function App() {
             ViewComponent = <Splash changeView={changeView} />;
             break;
     }
-
-    return (
-        <div id="chatbot_ui_container">
-            <Draggable handle=".handle" position={defaultPosition} onStop={(e, data) => setDefaultPosition({ x: data.x, y: data.y })}>
-                <div className={`draggable-container ${currentView}`}>
-                    <ResizableContainer
-                        width={size.width}
-                        height={size.height}
-                        minConstraints={[320, 480]}
-                        maxConstraints={[600, 800]}
-                        onResizeStop={(e, data) => setSize({ width: data.size.width, height: data.size.height })}
-                    >
-                        {currentView !== 'splash' && (
-                            <>
-                                <Header changeView={changeView} />
-                                <div className="content">
-                                    {ViewComponent}
-                                </div>
-                                <Footer changeView={changeView} />
-                            </>
-                        )}
-                        {currentView === 'splash' && ViewComponent}
-                    </ResizableContainer>
-                </div>
-            </Draggable>
+    
+    const content = (
+        <div className={`draggable-container ${currentView}`}>
+            <ResizableContainer
+                width={size.width}
+                height={size.height}
+                minConstraints={[320, 480]}
+                maxConstraints={[600, 800]}
+                onResizeStop={(e, data) => setSize({ width: data.size.width, height: data.size.height })}
+            >
+                {currentView !== 'splash' ? (
+                    <>
+                        <Header changeView={changeView} />
+                        <div className="content">{ViewComponent}</div>
+                        <Footer changeView={changeView} />
+                    </>
+                ) : (
+                    ViewComponent
+                )}
+            </ResizableContainer>
         </div>
+    );
+    
+    return isProjectContext ? (
+        content
+    ) : (
+        <Draggable
+            handle=".handle"
+            position={defaultPosition}
+            onStop={(e, data) => setDefaultPosition({ x: data.x, y: data.y })}
+        >
+            {content}
+        </Draggable>
     );
 }
 

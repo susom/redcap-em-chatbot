@@ -1,0 +1,67 @@
+{
+    "id": "pi_eligibility_policy",
+    "source_url": "https://doresearch.stanford.edu/policies/research-policy-handbook/principal-investigatorship/principal-investigator-eligibility-and-criteria-exceptions",
+    "title": "RPH 2.1: Principal Investigator Eligibility and Criteria for Exceptions",
+    "content_type": "webpage",
+    "scraped_at": "2025-07-15T19:15:00Z",
+    "content": {
+      "structured_sections": [
+        {
+          "heading": "Principal Investigator Eligibility Policy",
+          "content": "Eligibility to act as a Principal Investigator (PI) or Co-Principal Investigator (Co-PI) on externally and certain internally funded projects is a privilege limited to members of the Academic Council and the University Medical Line (UML) faculty. This is because PIs are responsible for the intellectual direction of research and the training of students and scholars. Emeriti faculty recalled to active duty are also eligible, provided the project is within their recall period and the department accepts responsibility. Faculty retired under the Faculty Retirement Incentive Program (FRIP) are not eligible to be recalled and cannot serve as PIs.",
+          "level": 1
+        },
+        {
+          "heading": "Overview of Exceptions",
+          "content": "There are four categories of exceptions to the PI eligibility policy. These exceptions allow individuals who are not Academic Council or UML faculty to serve as PIs under specific conditions and with varying levels of approval, from the Department Chair up to the Dean of Research.",
+          "level": 1
+        },
+        {
+          "heading": "Category A: Exceptions Requiring Department Chair Approval",
+          "content": "These exceptions are approved on a case-by-case basis by the Department Chair or their delegate. The approval must consider the proposal's quality, the proposed PI's qualifications, and its relevance to the university. This category includes: 1) Pending Appointments for New Faculty (award cannot be accepted until the appointment begins). 2) Doctoral Dissertation Research Improvement Grants (DDRIGs), where a graduate student can be Co-PI with their faculty advisor as the PI. 3) University Research Awards, which are internal Stanford funding programs.",
+          "level": 2
+        },
+        {
+          "heading": "Category B: Exceptions Requiring Department Chair and School Dean Approval",
+          "content": "These exceptions require written approval from both the Department Chair and the cognizant School Dean. This category includes proposals for: 1) Conferences, exhibits, workshops, or public events. 2) Specific projects within large interdisciplinary programs where no qualified faculty member is available to be PI. 3) Career Development Awards for researchers like Postdoctoral Scholars, under the mentorship of a faculty member. 4) Expanded Career Development Awards for exceptional MD, MD/PhD, and PhD fellows in the School of Medicine. 5) Clinical Educators (Clinical Assistant Professor or above) for clinical trials and patient-related research. 6) Projects within a shared facility or service center, led by MD or PhD-level staff.",
+          "level": 2
+        },
+        {
+          "heading": "Category C: Exceptions for SLAC National Accelerator Laboratory",
+          "content": "The Director of the SLAC National Accelerator Laboratory may approve SLAC Distinguished, Senior, and continuing Staff Scientists or Engineers to be PIs on non-DOE funded research proposals. This is subject to conditions that the research is programmatically relevant to SLAC's mission, is carried out on the SLAC site, and that any Stanford graduate students involved have an Academic Council member as a mentor.",
+          "level": 2
+        },
+        {
+          "heading": "Category D: Rare Exceptions Requiring Dean of Research Approval",
+          "content": "In unusual and non-recurring situations, the Dean of Research, along with the Department Chair and School Dean, may grant a PI waiver. These are rare and considered only for a specific project that meets a particular university need. Examples include proposals from visiting faculty, projects to be led by a faculty candidate whose appointment is not yet final, or the need for an orderly phase-out of a project when the original PI is no longer available. Six specific criteria must be met for these rare exceptions to be granted.",
+          "level": 2
+        },
+        {
+          "heading": "Other Project Designations",
+          "content": "The PI is responsible for establishing the project team. While Co-PI status is equivalent to PI status and follows the same eligibility rules, PIs can assign other roles at their discretion. These include: 'Associate Investigator' for members of the Academic Staff, Postdocs, or Instructors. 'Co-Investigator' can be used for senior members of the Academic Staff-Research or Libraries who have substantial project leadership roles.",
+          "level": 1
+        }
+      ],
+      "tables": [],
+      "links": []
+    },
+    "metadata": {
+      "word_count": 648,
+      "section_count": 7,
+      "table_count": 0,
+      "link_count": 0,
+      "parent_url": "https://ora.stanford.edu/initiate-a-new-pdrf",
+      "topics": [
+        "Principal Investigator",
+        "PI Eligibility",
+        "Research Policy Handbook",
+        "RPH",
+        "PI Waiver",
+        "Academic Council",
+        "UML Faculty",
+        "Sponsored Projects",
+        "SLAC"
+      ]
+    }
+  }
+  

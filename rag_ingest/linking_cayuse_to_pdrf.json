@@ -1,0 +1,60 @@
+{
+  "id": "linking_cayuse_to_pdrf",
+  "source_url": "https://ora.stanford.edu/resources/sera-and-cayuse-user-guides-and-resources/linking-a-cayuse-proposal-to-a-pdrf",
+  "title": "Linking a Cayuse Proposal to a PDRF | Office of Research Administration",
+  "content_type": "webpage",
+  "scraped_at": "2025-07-15T18:50:00Z",
+  "content": {
+    "structured_sections": [
+      {
+        "heading": "Overview and Transferred Information",
+        "content": "You can link any Stanford Cayuse proposal to a SeRA PDRF to automatically populate the form and reduce data entry. This can be done at any stage before the PDRF is completed. Information that can be pulled from Cayuse includes: Sponsor, Key Personnel, Subaward institutions, Proposal Dates, Title, CFDA/Opportunity numbers, Budget Amount, and answers to compliance questions (Human Subjects, Animal Subjects, etc.). The amount of data transferred depends on the completeness of the Cayuse application forms, such as the SF 424 RR and RR Key Persons forms.",
+        "level": 1
+      },
+      {
+        "heading": "Linking a Cayuse Proposal at PDRF Initiation",
+        "content": "When starting a new PDRF, select 'Yes' to the question 'Has a Cayuse application been started?'. Find the 10-digit Proposal ID in your Cayuse proposal (under the 'i' icon) and enter it into the SeRA PDRF's 'Cayuse Proposal ID' field. Clicking 'Start' will initiate the linking wizard.",
+        "level": 2
+      },
+      {
+        "heading": "PDRF Initiation Linking Wizard",
+        "content": "The wizard guides you through several verification steps. You cannot go backward, but you can cancel at any time. The steps are: 1) Verify Sponsor: Confirm the correct sponsor is being pushed to the PDRF. 2) Verify Personnel: Match personnel from the Cayuse 'RR Key Persons' form to their roles in SeRA. 3) Verify Subawards: Match subawards from the Cayuse 'RR Subaward Budget Attachment' form to SeRA records. 4) Verify Project Info: Review other data like dates and title, then click 'Finish'. Once linked, the Cayuse Proposal ID will appear on the PDRF's 'Admin & Sponsor Details' page and also be visible within Cayuse.",
+        "level": 3
+      },
+      {
+        "heading": "Linking a Cayuse Proposal to an Existing PDRF",
+        "content": "If a PDRF already exists, navigate to the 'Admin & Sponsor Details' page. Select 'Cayuse' as the submission method and click 'Link Cayuse Application'. Enter the 10-digit Cayuse Proposal ID. The linking wizard will then run, comparing existing PDRF data with the data from Cayuse and highlighting any discrepancies for manual or automatic updates.",
+        "level": 2
+      },
+      {
+        "heading": "Refreshing an Existing PDRF Link",
+        "content": "If you update information in a linked Cayuse proposal, you must refresh the link in SeRA. On the PDRF's 'Admin & Sponsor Details' page, click the 'Refresh' button next to the Cayuse link. This will re-run the linking wizard, allowing you to review changes and update the PDRF with the new information from Cayuse.",
+        "level": 2
+      },
+      {
+        "heading": "Additional Linking Information",
+        "content": "After a Cayuse application is submitted to Grants.gov, the assigned tracking number will appear in the PDRF Transaction Home and link back to the Cayuse application. You can also customize your SeRA Dashboard by adding the 'Cayuse Link' column to your 'My Action Items' view. This will display an icon for any PDRF that is linked to a Cayuse proposal, providing a direct link to the proposal in Cayuse.",
+        "level": 2
+      }
+    ],
+    "tables": [],
+    "links": []
+  },
+  "metadata": {
+    "word_count": 559,
+    "section_count": 6,
+    "table_count": 0,
+    "link_count": 0,
+    "parent_url": "https://ora.stanford.edu/initiate-a-new-pdrf",
+    "topics": [
+      "PDRF",
+      "Cayuse",
+      "Linking Proposals",
+      "SeRA",
+      "Budget Data",
+      "Proposal Routing",
+      "Data Entry",
+      "Grants.gov"
+    ]
+  }
+}

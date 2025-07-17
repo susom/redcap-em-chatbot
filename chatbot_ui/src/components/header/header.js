@@ -4,11 +4,13 @@ import { Archive, ChatDots } from 'react-bootstrap-icons';
 import "./header.css";
 
 function Header({ changeView }) {
+    const headerText = window.cappy_project_config?.title || "REDCapBot Support";
+
     return (
         <Container className="rcchat_header handle">
             <h1>
                 <span className="logo" onClick={() => changeView('splash')}></span>
-                REDCapBot Support
+                {headerText}
                 <button onClick={() => changeView('history')} className="archive">
                     <Archive size={20}/>
                 </button>

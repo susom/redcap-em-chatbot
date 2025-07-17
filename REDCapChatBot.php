@@ -31,26 +31,26 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     public function redcap_every_page_top($project_id) {
         //THIS IS THE PROPER EXCLUDE LIST FOR CAPPY, comment out for now to make it function as INCLUDE so that i can limited test on prod
-//        try {
-//            // List of pages to exclude UI injection
-//            $exclusion_list = $this->getSystemSetting("chatbot_exclude_list");
-//            $excludedPages = array_map('trim', explode(",", $exclusion_list));
-//
-//            $currentPage = $_SERVER['SCRIPT_NAME'] ?? '';
-//
-//            // Inject UI unless the current page is in the exclusion list
-//            foreach ($excludedPages as $excludedPage) {
-//                if (strpos($currentPage, $excludedPage) !== false) {
-//                    return; // Stop execution if the page is excluded
-//                }
-//            }
-//
-//            // Inject the UI
-//            $this->injectIntegrationUI();
-//
-//        } catch (\Exception $e) {
-//            \REDCap::logEvent('Exception injecting chatbot UI.', $e->getMessage());
-//        }
+        //        try {
+        //            // List of pages to exclude UI injection
+        //            $exclusion_list = $this->getSystemSetting("chatbot_exclude_list");
+        //            $excludedPages = array_map('trim', explode(",", $exclusion_list));
+        //
+        //            $currentPage = $_SERVER['SCRIPT_NAME'] ?? '';
+        //
+        //            // Inject UI unless the current page is in the exclusion list
+        //            foreach ($excludedPages as $excludedPage) {
+        //                if (strpos($currentPage, $excludedPage) !== false) {
+        //                    return; // Stop execution if the page is excluded
+        //                }
+        //            }
+        //
+        //            // Inject the UI
+        //            $this->injectIntegrationUI();
+        //
+        //        } catch (\Exception $e) {
+        //            \REDCap::logEvent('Exception injecting chatbot UI.', $e->getMessage());
+        //        }
 
         // TEMPORARY MAKE IT INCLUDE LIST SO I CAN LIMIT WHERE I TEST IT ON REDCAP PROD
         try {
@@ -104,9 +104,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $(function () { <?php echo implode(";\n", $cmds) ?> })
         </script>
         <?php
-//        $title = "The Enigmatic Festival of Quirp: Unveiling Ancient Traditions";
-//        $content = "The Festival of Quirp is an ancient and enigmatic celebration that has intrigued historians and anthropologists alike. Dating back to the early 3rd century, this festival was celebrated by the secluded Quirpian community, known for their profound connection with nature and celestial phenomena. The festival's highlight is the ceremonial lighting of the 'Eternal Flame,' believed to symbolize the community's everlasting spirit and unity. Participants don intricate costumes adorned with symbols representing the sun, moon, and stars, engaging in the 'Dance of the Moons,' a ritualistic performance said to harmonize human and cosmic energies. The festival also features the 'Feast of the Elements,' where attendees partake in a communal meal consisting of locally sourced foods, honoring the earth's bounty. Despite its decline in the modern era, the Festival of Quirp remains a subject of fascination, with scholars continually uncovering new insights into its rich cultural heritage.";
-//        $this->getRedcapRAGInstance()->storeDocument($title, $content);
     }
 
     public function injectIntegrationUI() {
@@ -207,7 +204,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      *
      * @return string Formatted project context string.
      */
-    public function getProjectContext()
+    public function getREDCapProjectContext()
     {
         global $Proj;
 
@@ -324,53 +321,97 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
 
+    /**
+     * Get a project-level or system-level setting, with optional fallback.
+     */
+    public function getSetting($key, $default = null) {
+        $project_val = $this->getProjectSetting($key);
+        if ($project_val !== '' && (!empty($project_val) || $project_val === 0)) return $project_val;
+    
+        if (strpos($key, 'project-') === 0) {
+            $system_key = substr($key, strlen('project-'));
+            $sys_val = $this->getSystemSetting($system_key);
+            if ($sys_val !== '' && (!empty($sys_val) || $sys_val === 0)) return $sys_val;
+        } else {
+            $sys_val = $this->getSystemSetting($key);
+            if ($sys_val !== '' && (!empty($sys_val) || $sys_val === 0)) return $sys_val;
+        }
+        return $default;
+    }
+    
+    public function setIfNotBlank(&$arr, $key, $value, $cast = null) {
+        if ($value !== null && $value !== '') {
+            $arr[$key] = ($cast === 'int') ? (int)$value
+                       : (($cast === 'float') ? (float)$value : $value);
+        }
+    }
+    
+
     public function redcap_module_ajax($action, $payload, $project_id=null, $record, $instrument, $event_id, $repeat_instance,
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
         switch ($action) {
             case "callAI":
                 $messages = $this->sanitizeInput($payload);
+                $model = $this->getSetting("project-llm-model");
+
+
+                // RAG project identifier
+                $rag_project_identifier = $this->getSetting("project_rag_project_identifier", self::DEFAULT_PROJECT_IDENTIFIER);
 
                 //DON'T WASTE LOGGING ON SYSTEM DATA INJECT IT HERE NOT ON THE INJECT JS
                 $initial_system_context = $this->getSystemSetting('chatbot_system_context');
-                if(!empty($initial_system_context)){
-                    $messages = $this->appendSystemContext($messages, $initial_system_context);
-                }
-
+                
                 //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
-                $current_project_context = $this->getProjectContext();
+                $current_project_context = $this->getREDCapProjectContext();
                 if(!empty($current_project_context)){
                     // Format the context string
                     $current_project_context = "Project Metadata:\n" . $current_project_context;
                     $messages = $this->appendSystemContext($messages, $current_project_context);
+                    $initial_system_context = $this->getProjectSetting('project_chatbot_system_context');
+                }
+
+                if(!empty($initial_system_context)){
+                    $messages = $this->appendSystemContext($messages, $initial_system_context);
                 }
 
                 //Add REDCap actions list to the system context
                 $actions_list_json = $this->getSystemSetting('redcap_actions_list');
-                if (!empty($actions_list_json)) {
+                if (!empty($actions_list_json) && empty($current_project_context)) {
                     $actions_list = json_decode($actions_list_json, true);
                     if (json_last_error() === JSON_ERROR_NONE) {
                         $actions_context = "Possible Actions:\n" . json_encode($actions_list, JSON_PRETTY_PRINT);
                         $messages = $this->appendSystemContext($messages, $actions_context);
                     }
+
+                    // Inject additional instruction for action matching and sentiment analysis
+                    $action_matching_context = "Analyze the user's query to determine its intent, match it to the appropriate REDCap action from the provided list (only if relevant!), and determine the sentiment on a scale of 1 to 5 (where 1 is very negative and 5 is very positive). Include this in the response.";
+                    $messages = $this->appendSystemContext($messages, $action_matching_context);
                 }
 
-                // Inject additional instruction for action matching and sentiment analysis
-                $action_matching_context = "Analyze the user's query to determine its intent, match it to the appropriate REDCap action from the provided list (only if relevant!), and determine the sentiment on a scale of 1 to 5 (where 1 is very negative and 5 is very positive). Include this in the response.";
-                $messages = $this->appendSystemContext($messages, $action_matching_context);
-
                 //FIND AND INJECT RAG TOO
-                $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
-                $ragContext = $this->getRedcapRAGInstance()?->getRelevantDocuments($projectIdentifier, $messages) ?? [];
+                $ragContext = $this->getRedcapRAGInstance()?->getRelevantDocuments($rag_project_identifier, $messages) ?? [];
                 foreach ($ragContext as $doc) {
-                    // $this->emDebug("oh yay i got some rag!", $doc['content']);
+                    $this->emDebug("GOT RAG?!", $doc);
                     $messages = $this->appendSystemContext($messages, self::RAG_CONTEXT_PREFIX . $doc['content']);
                 }
 
                 // $this->emDebug("initial general system context and project Metadata and RAG", $messages);
 
                 //CALL API ENDPOINT WITH AUGMENTED CHATML
-                $model = $this->getSystemSetting("llm-model");
-                $response = $this->getSecureChatInstance()->callAI($model, array("messages" => $messages));
+                $override_params = [
+                    "messages" => $messages
+                ];
+                
+                // Only add params if they're set (not null/empty string)
+                $override_params = ["messages" => $messages];
+                $this->setIfNotBlank($override_params, "temperature", $this->getSetting("project-gpt-temperature"), 'float');
+                $this->setIfNotBlank($override_params, "top_p", $this->getSetting("project-gpt-top-p"), 'float');
+                $this->setIfNotBlank($override_params, "frequency_penalty", $this->getSetting("project-gpt-frequency-penalty"), 'float');
+                $this->setIfNotBlank($override_params, "presence_penalty", $this->getSetting("project-gpt-presence-penalty"), 'float');
+                $this->setIfNotBlank($override_params, "max_tokens", $this->getSetting("project-gpt-max-tokens"), 'int');
+                $this->setIfNotBlank($override_params, "reasoning", $this->getSetting("project-reasoning-effort"));
+
+                $response = $this->getSecureChatInstance()->callAI($model, $override_params);
                 $result = $this->formatResponse($response);
 
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
@@ -444,8 +485,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $urls = array(
                  $this->getUrl('cron/check_em_project.php?cron=true', true, true)
                 ,$this->getUrl('cron/check_rssd_completions.php?cron=true', true, true)
-//                ,$this->getUrl('cron/check_community_portal.php?cron=true', true, true)
-//                ,$this->getUrl('cron/check_med_wiki.php?cron=true', true, true)
+            //                ,$this->getUrl('cron/check_community_portal.php?cron=true', true, true)
+            //                ,$this->getUrl('cron/check_med_wiki.php?cron=true', true, true)
             ); //has to be page
 
             foreach ($urls as $url) {
@@ -468,18 +509,19 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      */
     public function checkCommunityPortal($cron = false) {
         return;
-        $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
+        // RAG project identifier
+        $rag_project_identifier = $this->getSetting("project_rag_project_identifier", self::DEFAULT_PROJECT_IDENTIFIER);
         // Implement Community Portal check logic here
         $title = "Community Portal Updates";
         $content = "Example content from the Community Portal"; // Replace with actual fetched content
-        $this->getRedcapRAGInstance()->storeDocument($projectIdentifier, $title, $content);
+        $this->getRedcapRAGInstance()->storeDocument($rag_project_identifier, $title, $content);
     }
 
     /**
      * Checks updates from the MedWiki system and updates the context database.
      */
     public function checkMedWiki($cron = false) {
-        $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
+        $rag_project_identifier = $this->getSetting("project_rag_project_identifier", self::DEFAULT_PROJECT_IDENTIFIER);
 
         // File containing the HTML to parse
         $filePath = $this->getModulePath() . '/cron/rssd.txt';
@@ -547,7 +589,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             echo "</pre>";
 
             // Store the document in the context database
-            //$this->getRedcapRAGInstance()->storeDocument($projectIdentifier, $title, $formattedContent);
+            //$this->getRedcapRAGInstance()->storeDocument($rag_project_identifier, $title, $formattedContent);
             $this->emLog("Stored MedWiki content: $title");
 
         } catch (\Exception $e) {
@@ -559,7 +601,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      * Checks for completions in the RSSD system and updates the context database.
      */
     public function checkRSSDCompletions($cron = false) {
-        $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
+        $rag_project_identifier = $this->getSetting("project_rag_project_identifier", self::DEFAULT_PROJECT_IDENTIFIER);
 
         // Get API Key and other settings from EM System Settings
         $apiKey = $this->getSystemSetting('rag_atlassian_api');
@@ -619,7 +661,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $dateCreated = $fields['created'];
 
                     // Store the document in RAG
-                    $this->getRedcapRAGInstance()?->storeDocument($projectIdentifier, $title, $content, $dateCreated);
+                    $this->getRedcapRAGInstance()?->storeDocument($rag_project_identifier, $title, $content, $dateCreated);
                     $this->emLog("Stored ticket $key in RAG.");
                 }
 
@@ -674,7 +716,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     public function checkEMProject($cron = false) {
-        $projectIdentifier = self::DEFAULT_PROJECT_IDENTIFIER;
+        $rag_project_identifier = $this->getSetting("project_rag_project_identifier", self::DEFAULT_PROJECT_IDENTIFIER);
 
         // Determine the last cron run timestamp if in cron mode
         $lastCronRun = $cron ? ($this->getSystemSetting('last_cron_run') ?? date("Y-m-d H:i:s", strtotime("-1 day"))) : null;
@@ -712,7 +754,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 . "Maintenance Fee: " . ($maintenanceFee ? "Yes" : "No") . "\nMonthly Cost: {$fields['actual_monthly_cost']}";
 
             // Call the checkAndStoreDocument method from the RAG instance
-            $this->getRedcapRAGInstance()?->checkAndStoreDocument($projectIdentifier, $module_name, $content, $dateCreated);
+            $this->getRedcapRAGInstance()?->checkAndStoreDocument($rag_project_identifier, $module_name, $content, $dateCreated);
         }
 
         // If in cron mode, update the last cron run timestamp

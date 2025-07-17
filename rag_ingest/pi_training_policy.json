@@ -1,0 +1,55 @@
+{
+    "id": "pi_training_policy",
+    "source_url": "https://doresearch.stanford.edu/training/pi-training-stewardship-and-compliance-principal-investigators-dor-680",
+    "title": "PI Training: Stewardship and Compliance for Principal Investigators",
+    "content_type": "webpage",
+    "scraped_at": "2025-07-15T20:30:00Z",
+    "content": {
+      "structured_sections": [
+        {
+          "heading": "Course Overview",
+          "content": "Stanford requires individuals new to the position of Principal Investigator (PI) to understand the regulatory environment in which sponsored research is conducted. This course outlines that environment and is comprised of two modules: 1) Research and Scholarship and 2) Financial Management.",
+          "level": 1
+        },
+        {
+          "heading": "Intended Audience",
+          "content": "This training is intended for Principal Investigators and their research teams.",
+          "level": 2
+        },
+        {
+          "heading": "Who is Required to Take This Training?",
+          "content": "All individuals serving as a Principal Investigator on sponsored projects and University Research are required to complete this training. An award cannot be accepted by the university until this training has been completed by the PI. The completion date is reflected in both the STARS system and in SeRA.",
+          "level": 2
+        },
+        {
+          "heading": "How to Receive Credit",
+          "content": "The course consists of two modules that must be taken sequentially. To receive credit and complete the training, you must certify your understanding of the material presented and acknowledge your agreement to abide by Stanford's research regulatory framework at the end of the course.",
+          "level": 2
+        },
+        {
+          "heading": "Accessing the Course",
+          "content": "The course, titled 'DOR-0680: PI Training: Stewardship and Compliance for Principal Investigators', can be accessed through the Axess/STARS system.",
+          "level": 2
+        }
+      ],
+      "tables": [],
+      "links": []
+    },
+    "metadata": {
+      "word_count": 268,
+      "section_count": 5,
+      "table_count": 0,
+      "link_count": 0,
+      "parent_url": "https://ora.stanford.edu/initiate-a-new-pdrf",
+      "topics": [
+        "PI Training",
+        "Compliance",
+        "Stewardship",
+        "Sponsored Research",
+        "SeRA",
+        "STARS",
+        "Principal Investigator"
+      ]
+    }
+  }
+  

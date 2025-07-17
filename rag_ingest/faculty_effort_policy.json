@@ -1,0 +1,55 @@
+{
+    "id": "faculty_effort_policy",
+    "source_url": "https://doresearch.stanford.edu/topics/faculty-effort",
+    "title": "Faculty Effort",
+    "content_type": "webpage",
+    "scraped_at": "2025-07-15T19:45:00Z",
+    "content": {
+      "structured_sections": [
+        {
+          "heading": "Definition of Effort",
+          "content": "Effort is the proportion of time spent on an activity, expressed as a percentage of an individual's total University-compensated effort, which cannot exceed 100%. It is not defined by a specific number of hours per week. Stanford University requires a commitment of effort from the Principal Investigator (PI) during the period in which project work is being performed. Any effort committed in a proposal and awarded by a sponsor must be matched with an equivalent salary charge, either directly to the sponsor or to a cost-sharing account.",
+          "level": 1
+        },
+        {
+          "heading": "Exceptions to PI Effort Requirement",
+          "content": "The requirement for PI effort does not extend to certain types of awards, including: equipment grants, seed grants for students/postdocs where the faculty member is a mentor, dissertation support, training grants, and other limited-purpose awards like travel or conference grants.",
+          "level": 2
+        },
+        {
+          "heading": "Stanford Base Salary (SBS)",
+          "content": "Stanford Base Salary (SBS) is the annual compensation paid by the university for research, teaching, and other activities. It includes regular and supplemental salary but excludes honoraria, vacation accrual, bonus payments, housing allowances, and any income earned from outside consulting.",
+          "level": 1
+        },
+        {
+          "heading": "Key Points on Effort Commitment",
+          "content": "Salary charged to a sponsored project is calculated as the percentage of committed effort multiplied by the Stanford Base Salary. No one can have more than 100% FTE, and most schools require a portion of effort to be reserved for non-sponsored activities. Research-only faculty on 12-month appointments may typically charge up to 95% to sponsored projects. Faculty on 9-month appointments can charge up to 90% during the summer. In the School of Medicine, all faculty must reserve at least 5% of their effort for non-sponsored activities. While PIs may submit multiple proposals, at the time of award, a reasonable representation of time to be devoted to the project is necessary. All salary charged must be supported by documented effort, which is certified by the PI through Labor Distribution (LD) schedules.",
+          "level": 1
+        },
+        {
+          "heading": "PI Absence or Reduction in Effort",
+          "content": "The federal Uniform Guidance acknowledges that a PI can be absent from campus but remain fully engaged in their research through electronic means of communication.",
+          "level": 2
+        }
+      ],
+      "tables": [],
+      "links": []
+    },
+    "metadata": {
+      "word_count": 401,
+      "section_count": 5,
+      "table_count": 0,
+      "link_count": 0,
+      "parent_url": "https://ora.stanford.edu/initiate-a-new-pdrf",
+      "topics": [
+        "Faculty Effort",
+        "Effort Commitment",
+        "Stanford Base Salary (SBS)",
+        "Sponsored Projects",
+        "Cost Sharing",
+        "Labor Distribution",
+        "PI Absence"
+      ]
+    }
+  }
+  

@@ -9,6 +9,8 @@ export const Messages = () => {
     const chat_context = useContext(ChatContext);
     const newQaRef = useRef(null);
 
+    const introText = window.cappy_project_config?.intro || "Hi I am Cappy! Your REDCap Support buddy. How can I assist you today?";
+
     const handleClick = (vote, index) => {
         chat_context.updateVote(index, vote);
     };
@@ -78,7 +80,7 @@ export const Messages = () => {
                             </React.Fragment>
                         ))
                     )
-                    : (<p className={`empty`}><em className={`soft_text`}>Hi I am Cappy! Your REDCap Support buddy.  How can I assist you today?</em></p>)
+                    : (<p className={`empty`}><em className={`soft_text`}>{introText}</em></p>)
             }
         </div>
     );

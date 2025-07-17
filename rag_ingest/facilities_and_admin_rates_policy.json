@@ -1,0 +1,68 @@
+{
+    "id": "facilities_and_admin_rates_policy",
+    "source_url": "https://doresearch.stanford.edu/policies/research-policy-handbook/financial-aspects-sponsored-projects-administration/facilities-and-administrative-indirect-cost-and-fringe-benefits-rates",
+    "title": "RPH 15.1: Facilities and Administrative (Indirect Cost) and Fringe Benefits Rates",
+    "content_type": "webpage",
+    "scraped_at": "2025-07-15T19:25:00Z",
+    "content": {
+      "structured_sections": [
+        {
+          "heading": "Introduction to F&A and Fringe Benefit Rates",
+          "content": "Facilities & Administrative (F&A) rates, also known as indirect cost rates, and fringe benefit rates are established in accordance with the federal government's Office of Management and Budget (OMB). These rates are negotiated between Stanford and the Office of Naval Research (ONR). All proposals must include budget requests for these costs using the negotiated rates, unless a reduced rate is approved on a case-by-case basis. The Office of the Dean of Research maintains a list of sponsors with pre-approved lower rates.",
+          "level": 1
+        },
+        {
+          "heading": "Application of On- and Off-Campus F&A Rates",
+          "content": "F&A rates apply to all externally-sponsored projects and allow Stanford to recover costs for facilities, utilities, administration, etc. The determination of whether a project is on- or off-campus is critical for applying the correct rate.",
+          "level": 2
+        },
+        {
+          "heading": "Definition of 'Off-Campus'",
+          "content": "A project is considered off-campus if the activity is conducted at a location not on Stanford's academic lands, and the majority of Stanford's facility-related costs are not applicable. If a project is directly charged for leased space, it is considered off-campus. Teleworking from a residence does not qualify a project as off-campus because Stanford's operating costs continue to be incurred.",
+          "level": 3
+        },
+        {
+          "heading": "Rules for Partially Off-Campus Projects",
+          "content": "For projects conducted partially off-campus, the F&A rate is determined based on the project's Modified Total Direct Costs (MTDC). For awards under $100,000 in MTDC, the rate is determined by where the majority (over 50%) of costs are expended. For awards of $100,000 or more in MTDC, the costs are apportioned between on- and off-campus rates, but only if the lesser component is 20% or more of the total MTDC. If the lesser component is under 20%, the rate of the larger component applies to the entire project.",
+          "level": 3
+        },
+        {
+          "heading": "Modified Total Direct Costs (MTDC)",
+          "content": "MTDC is the base to which F&A rates are applied. As defined by OMB's Uniform Guidance, MTDC includes direct salaries, fringe benefits, materials, services, travel, and the first $25,000 of each subaward. It excludes equipment, capital expenditures, patient care charges, rental costs, tuition, scholarships, fellowships, participant support costs, and the portion of each subaward over $25,000.",
+          "level": 1
+        },
+        {
+          "heading": "Application of F&A Rates to MTDC vs. TDC",
+          "content": "For federally-sponsored projects where the sponsor's published F&A rate is less than Stanford's negotiated rate but doesn't specify a base, the MTDC base must be used. For non-federally-sponsored projects with a published rate lower than Stanford's, the Total Direct Costs (TDC) base is used.",
+          "level": 2
+        },
+        {
+          "heading": "Fringe Benefit Rates",
+          "content": "Fringe benefit rates are applied to the salary and wage base of a project. Different rates apply to different employee categories. The 'Regular Employee Benefits Rate' applies to most employees. Graduate students with assistantship appointments are charged the 'Graduate Assistantship Rate,' which includes a health insurance subsidy. Temporary employees are charged the 'Contingent Employee Benefits Rate,' and Postdoctoral Scholars are charged the 'Postdoctoral Scholars Rate.'",
+          "level": 1
+        }
+      ],
+      "tables": [],
+      "links": []
+    },
+    "metadata": {
+      "word_count": 518,
+      "section_count": 7,
+      "table_count": 0,
+      "link_count": 0,
+      "parent_url": "https://ora.stanford.edu/initiate-a-new-pdrf",
+      "topics": [
+        "F&A Rates",
+        "Indirect Costs",
+        "Fringe Benefits",
+        "MTDC",
+        "On-Campus",
+        "Off-Campus",
+        "Sponsored Projects",
+        "RPH",
+        "OMB",
+        "ONR"
+      ]
+    }
+  }
+  

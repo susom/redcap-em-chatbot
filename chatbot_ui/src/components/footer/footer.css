@@ -19,6 +19,7 @@
     border: none;
     width: 82%;
     padding: 10px 0;
+    font-size: 85%;
 }
 
 .footer .user_input:focus {
