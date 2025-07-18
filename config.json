@@ -79,12 +79,6 @@
 
     "project-settings": [
         {
-            "key": "enable-project-debug-logging",
-            "name": "<b>Enable Debug Logging</b><br><i>(optional)</i> Requires installation and configuration of emLogger",
-            "required": false,
-            "type": "checkbox"
-        },
-        {
             "key": "project_chatbot_title",
             "name": "Project Chatbot Title",
             "required": false,
@@ -119,6 +113,12 @@
             "name": "Custom CSS for Standalone Chatbot",
             "required": false,
             "type": "textarea"
+        },
+        {
+            "key": "inject-project-metadata",
+            "name": "<b>Inject Project Metadata into System Prompt</b><br><i>(optional)</i> Adds full REDCap project metadata to the prompt. Can be large — useful for debugging or development.",
+            "required": false,
+            "type": "checkbox"
         },
         {
             "key": "project-llm-model",
@@ -212,6 +212,12 @@
                 }
             ],
             "default": "medium"
+        },
+        {
+            "key": "enable-project-debug-logging",
+            "name": "<b>Enable Debug Logging</b><br><i>(optional)</i> Requires installation and configuration of emLogger",
+            "required": false,
+            "type": "checkbox"
         }
     ],
 

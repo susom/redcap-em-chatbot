@@ -359,24 +359,20 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $rag_project_identifier = $this->getSetting("project_rag_project_identifier", self::DEFAULT_PROJECT_IDENTIFIER);
 
                 //DON'T WASTE LOGGING ON SYSTEM DATA INJECT IT HERE NOT ON THE INJECT JS
-                $initial_system_context = $this->getSystemSetting('chatbot_system_context');
-                
-                //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
-                $current_project_context = $this->getREDCapProjectContext();
-                if(!empty($current_project_context)){
-                    // Format the context string
-                    $current_project_context = "Project Metadata:\n" . $current_project_context;
-                    $messages = $this->appendSystemContext($messages, $current_project_context);
-                    $initial_system_context = $this->getProjectSetting('project_chatbot_system_context');
-                }
+                $initial_system_context = ($this->getProjectSetting('project_chatbot_system_context')) ? $this->getProjectSetting('project_chatbot_system_context') : $this->getSystemSetting('chatbot_system_context');
 
-                if(!empty($initial_system_context)){
-                    $messages = $this->appendSystemContext($messages, $initial_system_context);
+                //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
+                if ($this->getProjectSetting('inject-project-metadata')) {
+                    $current_project_context = $this->getREDCapProjectContext();
+                    if (!empty($current_project_context)) {
+                        $current_project_context = "Project Metadata:\n" . $current_project_context;
+                        $messages = $this->appendSystemContext($messages, $current_project_context);
+                    }
                 }
 
                 //Add REDCap actions list to the system context
                 $actions_list_json = $this->getSystemSetting('redcap_actions_list');
-                if (!empty($actions_list_json) && empty($current_project_context)) {
+                if (!empty($actions_list_json)) {
                     $actions_list = json_decode($actions_list_json, true);
                     if (json_last_error() === JSON_ERROR_NONE) {
                         $actions_context = "Possible Actions:\n" . json_encode($actions_list, JSON_PRETTY_PRINT);
@@ -395,13 +391,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $messages = $this->appendSystemContext($messages, self::RAG_CONTEXT_PREFIX . $doc['content']);
                 }
 
+                // FINALLY ADD THE SYSTEM PROMPT
+                if(!empty($initial_system_context)){
+                    $messages = $this->appendSystemContext($messages, $initial_system_context);
+                }
+
                 // $this->emDebug("initial general system context and project Metadata and RAG", $messages);
 
-                //CALL API ENDPOINT WITH AUGMENTED CHATML
-                $override_params = [
-                    "messages" => $messages
-                ];
-                
                 // Only add params if they're set (not null/empty string)
                 $override_params = ["messages" => $messages];
                 $this->setIfNotBlank($override_params, "temperature", $this->getSetting("project-gpt-temperature"), 'float');
