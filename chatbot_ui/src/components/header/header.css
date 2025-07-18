@@ -27,13 +27,13 @@
     border: none;
     background: none;
     color: #fff;
+    float: right;
 }
 
 .rcchat_header .archive {
-    float: right;
-    margin-left: 5px;
+    margin-left: 0;
 }
 
-.rcchat_header .chat {
-    float: right;
-}
+.rcchat_header .fullscreen{
+    margin-left: 0;
+} 

@@ -19,10 +19,10 @@ function App() {
     const changeView = (viewName) => {
         // Send resize instructions to parent
         if (viewName === 'splash') {
-            window.parent.postMessage({ type: 'resize-cappy', width: 120, height: 120 }, '*');
+            window.parent.postMessage({ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }, '*');
             setDefaultPosition({ x: 0, y: 0 });
         } else if (viewName === 'home' || viewName === 'history') {
-            window.parent.postMessage({ type: 'resize-cappy', width: 380, height: 600 }, '*');
+            window.parent.postMessage({ type: 'resize-cappy', source: viewName, width: 360, height: 520 }, '*');
         }
         setCurrentView(viewName);
     };
