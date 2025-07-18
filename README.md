@@ -44,12 +44,66 @@ This External Module (EM) integrates a Support Chat Bot UI widget into Stanford 
 
 ---
 
+## 📬 postMessage Communication
+
+### Outgoing Messages (from Chatbot App → Parent)
+
+| Type             | Description                                  | Example Payload |
+|------------------|----------------------------------------------|------------------|
+| `resize-cappy`   | Ask parent to resize the iframe              | `{ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }` |
+| `full-screen`    | Request to expand the iframe fullscreen      | `{ type: 'full-screen' }` |
+| `collapse-cappy` | Ask parent to collapse back to badge size    | `{ type: 'collapse-cappy' }` |
+| `navigate`       | (From parent to chatbot, but chatbot may re-broadcast) Navigate to specific view | `{ type: 'navigate', view: 'home' }` |
+
+### Incoming Messages (Parent → Chatbot App)
+
+| Type                  | Description |
+|------------------------|-------------|
+| `collapse-cappy`       | Collapse widget to badge view (triggers `changeView('splash')`) |
+| `navigate`             | Switch to a specific chatbot view (e.g. `'home'`, `'history'`) |
+| Custom types (e.g. `project_detail`, `project_dashboard`, etc.) | Injected Dynamic project context  |
+
+
+---
+
 ## Dynamic Project Context (postMessage Injection)
 
 - Supports postMessage-based context injection for embedding the chatbot in iframes or custom dashboards.
-- Allowed event types are set in `project_allowed_context_types` (comma-separated).
+- Allowed custom event types are set in `project_allowed_context_types` em project setting (comma-separated).
 - Frontend listens for `postMessage` events of these types to update the chat context.
 - **If you embed the chatbot, document which event types to use for context.**
+
+
+---
+
+
+```
++-------------------+             postMessage             +----------------------+
+|                   |----------------------------------->|                      |
+|  Chatbot iframe   |                                    |   Parent REDCap page |
+|   (React app)     |<-----------------------------------|     (root.php)       |
+|                   |         postMessage listener       |                      |
++-------------------+                                    +----------------------+
+        |                                                      ^
+        |                                                      |
+        | changeView('home')                                   |
+        |   └─> postMessage: { type: 'resize-cappy', ... }      |
+        |                                                      |
+        | click "fullscreen"                                   |
+        |   └─> postMessage: { type: 'full-screen' }            |
+        |                                                      |
+        | receives:                                            |
+        |   - { type: 'collapse-cappy' } → changeView('splash')|
+        |   - { type: 'navigate', view: 'home' }               |
+        |   - { type: 'project_detail', ... }                  |
+        v                                                      |
++-------------------+                                          |
+|  Internal Logic    |<-----------------------------------------+
+|  + Header buttons  |
+|  + Draggable + Resizable
++-------------------+
+```
+
 
 ---
 
