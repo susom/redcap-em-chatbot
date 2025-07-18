@@ -1,76 +1,127 @@
 <?php
 /** @var \Stanford\REDCapChatBot\REDCapChatBot $module */
+$rag = $module->getRedcapRAGInstance();
+$projectIdentifier = $module->getSetting("project_rag_project_identifier");
+?>
 
-echo "<pre>";
-try {
-    // Check RAG EM instance
-    $rag = $module->getRedcapRAGInstance();
-    if (!$rag) {
-        echo "Error: Could not load RedcapRAG EM instance via Cappy.\n";
-        exit;
-    }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cappy RAG Ingestion</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; max-width: 700px; margin: auto; }
+    h2 { margin-bottom: 0.25em; }
+    input[type="file"] { margin: 1em 0; }
+    pre.template { background: #f4f4f4; padding: 1em; white-space: pre-wrap; word-break: break-word; }
+    .result { margin-top: 2em; white-space: pre-wrap; font-family: monospace; background: #f9f9f9; padding: 1em; border-left: 4px solid #ccc; }
+  </style>
+</head>
+<body>
+<h2>Cappy RAG Ingestion</h2>
 
-    // // For debugging: Test with Quirp
-    $projectIdentifier = \Stanford\REDCapChatBot\REDCapChatBot::DEFAULT_PROJECT_IDENTIFIER;
-    // $title = "The Enigmatic Festival of Quirp: Unveiling Ancient Traditions";
-    // $content = "The Festival of Quirp is an ancient and enigmatic celebration that has intrigued historians and anthropologists alike. Dating back to the early 3rd century, this festival was celebrated by the secluded Quirpian community, known for their profound connection with nature and celestial phenomena. The festival's highlight is the ceremonial lighting of the 'Eternal Flame,' believed to symbolize the community's everlasting spirit and unity. Participants don intricate costumes adorned with symbols representing the sun, moon, and stars, engaging in the 'Dance of the Moons,' a ritualistic performance said to harmonize human and cosmic energies. The festival also features the 'Feast of the Elements,' where attendees partake in a communal meal consisting of locally sourced foods, honoring the earth's bounty. Despite its decline in the modern era, the Festival of Quirp remains a subject of fascination, with scholars continually uncovering new insights into its rich cultural heritage.";
-    // $rag->storeDocument($projectIdentifier, $title, $content);
-    // echo "Test doc (Quirp) stored.<br><br>";
-    // exit;
+<p>
+  This will ingest RAG documents into the scope of this project:
+</p>
+<ul>
+  <li><strong>Project Identifier:</strong> <code><?= htmlspecialchars($projectIdentifier) ?></code></li>
+</ul>
 
+<form method="POST" enctype="multipart/form-data">
+  <input type="hidden" name="redcap_csrf_token" value="<?= $module->getCSRFToken() ?>">
+  <label>Select one or more <code>.json</code> files to ingest:</label><br>
+  <input type="file" name="rag_files[]" accept=".json" multiple required><br>
+  <button type="submit">Upload & Ingest</button>
+</form>
 
-    // Ingest all JSONs in rag_ingest dir
-    $dir = __DIR__;
-    $files = glob("$dir/*.json");
-    foreach ($files as $file) {
-        if (basename($file) === 'master_index.json') continue;
-        echo "Processing: " . basename($file) . "\n";
-
-        $json = json_decode(file_get_contents($file), true);
-        if (!$json) {
-            echo "  Failed to parse $file. Skipping.\n";
-            continue;
-        }
-
-        $sections = $json['content']['structured_sections'] ?? [];
-        $metadata = $json['metadata'] ?? [];
-        $topics = $metadata['topics'] ?? [];
-        $source_url = $json['source_url'] ?? '';
-
-        // Ingest sections
-        foreach ($sections as $section) {
-            $title = $section['heading'] ?? 'Untitled Section';
-            $content = $section['content'] ?? '';
-            $level = $section['level'] ?? null;
-            $meta = [
-                'level' => $level,
-                'topics' => $topics,
-                'source_url' => $source_url,
-                'file' => basename($file)
-            ];
-            $doc = $content . "\n\n(Metadata: " . json_encode($meta) . ")";
-            $rag->storeDocument($projectIdentifier, $title, $doc);
-        }
-
-        // Ingest tables if present
-        $tables = $json['content']['tables'] ?? [];
-        foreach ($tables as $table) {
-            $caption = $table['title'] ?? 'Table';
-            $headers = implode(" | ", $table['headers'] ?? []);
-            $rows = implode("\n", array_map(fn($r) => implode(" | ", $r), $table['rows'] ?? []));
-            $table_content = "$caption\n$headers\n$rows";
-            $meta = [
-                'type' => 'table',
-                'source_url' => $source_url,
-                'file' => basename($file)
-            ];
-            $doc = $table_content . "\n\n(Metadata: " . json_encode($meta) . ")";
-            $rag->storeDocument($project_identifier, $caption, $doc);
-        }
-        echo "  Finished: " . basename($file) . "\n";
-    }
-    echo "\nAll ingestion complete.<br>";
-} catch (\Exception $e) {
-    echo "Error: " . $e->getMessage();
+<h3>JSON File Template</h3>
+<pre class="template">
+{
+  "source_url": "https://example.com/doc.html",
+  "metadata": {
+    "topics": ["consent", "privacy"]
+  },
+  "content": {
+    "structured_sections": [
+      {
+        "heading": "Introduction",
+        "level": 1,
+        "content": "This is the intro text."
+      }
+    ],
+    "tables": [
+      {
+        "title": "Consent Table",
+        "headers": ["Item", "Response"],
+        "rows": [["Q1", "Yes"], ["Q2", "No"]]
+      }
+    ]
+  }
 }
-echo "</pre>";
+</pre>
+
+<?php
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['rag_files'])) {
+    echo "<div class='result'><strong>Processing Uploaded Files...</strong>\n\n";
+
+    if (!$rag) {
+        echo "Error: Could not load RedcapRAG EM instance.\n";
+    } else {
+        $files = $_FILES['rag_files'];
+
+        for ($i = 0; $i < count($files['name']); $i++) {
+            $name = $files['name'][$i];
+            $tmp = $files['tmp_name'][$i];
+
+            echo "File: $name\n";
+
+            $json = json_decode(file_get_contents($tmp), true);
+            if (!$json) {
+                echo "  ❌ Failed to parse JSON. Skipping.\n";
+                continue;
+            }
+
+            $sections = $json['content']['structured_sections'] ?? [];
+            $metadata = $json['metadata'] ?? [];
+            $topics = $metadata['topics'] ?? [];
+            $source_url = $json['source_url'] ?? '';
+
+            foreach ($sections as $section) {
+                $title = $section['heading'] ?? 'Untitled Section';
+                $content = $section['content'] ?? '';
+                $level = $section['level'] ?? null;
+                $meta = [
+                    'level' => $level,
+                    'topics' => $topics,
+                    'source_url' => $source_url,
+                    'file' => $name
+                ];
+                $doc = $content . "\n\n(Metadata: " . json_encode($meta) . ")";
+                $rag->storeDocument($projectIdentifier, $title, $doc);
+            }
+
+            $tables = $json['content']['tables'] ?? [];
+            foreach ($tables as $table) {
+                $caption = $table['title'] ?? 'Table';
+                $headers = implode(" | ", $table['headers'] ?? []);
+                $rows = implode("\n", array_map(fn($r) => implode(" | ", $r), $table['rows'] ?? []));
+                $table_content = "$caption\n$headers\n$rows";
+                $meta = [
+                    'type' => 'table',
+                    'source_url' => $source_url,
+                    'file' => $name
+                ];
+                $doc = $table_content . "\n\n(Metadata: " . json_encode($meta) . ")";
+                $rag->storeDocument($projectIdentifier, $caption, $doc);
+            }
+
+            echo "  ✅ Finished ingesting $name\n\n";
+        }
+    }
+
+    echo "All ingestion complete.</div>";
+}
+?>
+
+</body>
+</html>

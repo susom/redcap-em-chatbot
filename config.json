@@ -28,9 +28,15 @@
     "links": {
         "project": [
             {
-                "name": "Cappy Chatbot",
-                "icon": "comments",
+                "name": "Standalone Project Chatbot",
+                "icon": "fa-solid fa-robot",
                 "url": "pages/standalone_chat.php",
+                "show-header-and-footer": false
+            },
+            {
+                "name": "Project Chatbot RAG Ingestor",
+                "icon": "fa-solid fa-gear",
+                "url": "rag_ingest/ragit.php",
                 "show-header-and-footer": false
             }
         ],
@@ -94,7 +100,7 @@
             "key": "project_chatbot_intro",
             "name": "Chat Intro Messaging",
             "required": false,
-            "type": "text"
+            "type": "textarea"
         },
         {
             "key": "project_allowed_context_types",
