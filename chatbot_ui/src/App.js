@@ -36,7 +36,10 @@ function App() {
     useEffect(() => {
         const handler = (event) => {
             if (event.data && event.data.type === 'collapse-cappy') {
-            changeView('splash');
+                changeView('splash');
+            }
+            if (event.data?.type === 'navigate') {
+                changeView(event.data.view);
             }
         };
         window.addEventListener('message', handler);
