@@ -89,6 +89,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['rag_files'])) {
             foreach ($sections as $section) {
                 $title = $section['heading'] ?? 'Untitled Section';
                 $content = $section['content'] ?? '';
+                $points = $section['points'] ?? [];
+                if (!empty($points)) {
+                    $content .= "\n\nPoints:\n- " . implode("\n- ", $points);
+                }
+
                 $level = $section['level'] ?? null;
                 $meta = [
                     'level' => $level,
