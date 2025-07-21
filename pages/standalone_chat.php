@@ -7,6 +7,11 @@ if (empty($initial_system_context)) {
     $initial_system_context = $module->getSystemSetting('chatbot_system_context');
 }
 
+$globalUsername = $_SESSION['username'];
+if (!empty($globalUsername)) {
+    $initial_system_context = "Current username: {$globalUsername}\n\n" . $initial_system_context;
+}
+
 $title = $module->getProjectSetting('project_chatbot_title') ?: $module->getSystemSetting('chatbot_title') ?: null;
 $intro_text = $module->getProjectSetting('project_chatbot_intro') ?: null;
 
