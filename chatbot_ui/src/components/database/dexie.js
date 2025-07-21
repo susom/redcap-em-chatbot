@@ -12,7 +12,7 @@ export async function deleteAllData(){
 
 export async function saveNewSession(session_id, timestamp, queries) {
   try {
-    const id = await db_cached_chats.chats.add({session_id, timestamp, queries });
+    const id = await db_cached_chats.chats.put({session_id, timestamp, queries });
     console.log("Saved document with id:", id);
   } catch (error) {
     console.error("Error saving document:", error);

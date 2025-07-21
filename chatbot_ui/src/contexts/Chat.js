@@ -15,6 +15,8 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     const chatContextRef = useRef(chatContext);
 
     const DYNAMIC_CONTEXT_LABEL = "Active Project Context";
+    const injectedUsername = useRef(false);
+
 
     useEffect(() => {
         console.log("apiContext updated: ", apiContext);
@@ -72,7 +74,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         updatedApiContext = [
             ...(systemContext ? [systemContext] : []),
             ...userAssistantTurns,
-            { role: message.role, content: message.content, index: userAssistantTurns.length },
+            { role: message.role, content: message.content, index: userAssistantTurns.length, meta: message.meta ?? undefined  }
         ];
         updateApiContext(updatedApiContext);
     
@@ -84,6 +86,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                     user_content: message.role === 'user' ? message.content : null,
                     assistant_content: message.role === 'assistant' ? message.content : null,
                     timestamp: new Date().getTime(),
+                    meta: message.meta ?? undefined 
                 },
             ];
             updateChatContext(newChatContext);
@@ -107,7 +110,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
         const updatedApiContext = [
             ...apiContextRef.current,
-            { role: 'assistant', content: assistantResponse.content, index },
+            { role: 'assistant', content: assistantResponse.content, index, meta: response.meta ?? undefined  },
         ];
         updateApiContext(updatedApiContext);
     };
@@ -135,19 +138,14 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     };
 
     const callAjax = (payload, callback) => {
-        const initialSystemContextArray = window.chatbot_jsmo_module.getInitialSystemContext();
-        if (Array.isArray(initialSystemContextArray) && initialSystemContextArray.length > 0) {
-            const initial_system_context = initialSystemContextArray.pop();
-            console.log("Injecting initial system context:", initial_system_context);
-            addMessage(initial_system_context);
-
-            // 💡 Inject username as a user message
-            if (window.cappy_project_config?.current_user) {
-                addMessage({
-                    role: "user",
-                    content: `My name is ${window.cappy_project_config.current_user}. Please call me that in this chat.`
-                });
-            }
+        if (!injectedUsername.current && window.cappy_project_config?.current_user) {
+            console.log("Injecting username message...", window.cappy_project_config?.current_user);
+            addMessage({
+                role: "user",
+                content: `My name is ${window.cappy_project_config.current_user}. Please call me that in this chat.`,
+                meta: { internal: true }
+            });
+            injectedUsername.current = true;
         }
 
         // Inject project context system message if present

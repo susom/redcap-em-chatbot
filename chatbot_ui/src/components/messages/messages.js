@@ -43,45 +43,49 @@ export const Messages = () => {
         }
     }, [chat_context.chatContext]);
 
+    const visibleMessages = chat_context.chatContext.filter(m => m?.meta?.internal !== true);
+
     return (
         <div className={`messages`}>
-            {
-                chat_context && chat_context.chatContext && chat_context.chatContext.length > 0
-                    ? (
-                        chat_context.chatContext.map((message, index) => (
-                            <React.Fragment key={index}>
-                                <dl ref={index === chat_context.chatContext.length - 1 ? newQaRef : null}>
-                                    <dt>
-                                        {message.user_content}
-                                        <XCircleFill className="delete-icon" onClick={() => handleDelete(index)} />
-                                    </dt>
-                                    {message.assistant_content && (
-                                        <dd>
-                                            <ReactMarkdown>{message.assistant_content}</ReactMarkdown>
-                                            <div className={'msg_meta'}>
-                                                <div className={'token_usage'}>
-                                                    <div>Input Tokens: {message.input_tokens}</div>
-                                                    <div>Output Tokens: {message.output_tokens}</div>
-                                                </div>
-                                                <div className={`votes`}>
-                                                    {chat_context.showRatingPO ? popoverOverlay : ""}
-                                                    <div className={`vote up`} onClick={() => { handleClick(1, index) }}>
-                                                        {message.rating === 1 ? (<HandThumbsUpFill color="#ccc" size={20}/>) : (<HandThumbsUp color="#ccc" size={20}/>)}
-                                                    </div>
-                                                    <div className={`vote down`} onClick={() => { handleClick(0, index) }}>
-                                                        {message.rating === 0 ? (<HandThumbsDownFill color="#ccc" size={20}/>) : (<HandThumbsDown color="#ccc" size={20}/>)}
-                                                    </div>
-                                                </div>
+            {visibleMessages.length > 0 ? (
+                visibleMessages.map((message, index) => (
+                    <React.Fragment key={index}>
+                        <dl ref={index === visibleMessages.length - 1 ? newQaRef : null}>
+                            <dt>
+                                {message.user_content}
+                                <XCircleFill className="delete-icon" onClick={() => handleDelete(index)} />
+                            </dt>
+                            {message.assistant_content && (
+                                <dd>
+                                    <ReactMarkdown>{message.assistant_content}</ReactMarkdown>
+                                    <div className={'msg_meta'}>
+                                        <div className={'token_usage'}>
+                                            <div>Input Tokens: {message.input_tokens}</div>
+                                            <div>Output Tokens: {message.output_tokens}</div>
+                                        </div>
+                                        <div className={`votes`}>
+                                            {chat_context.showRatingPO ? popoverOverlay : ""}
+                                            <div className={`vote up`} onClick={() => { handleClick(1, index) }}>
+                                                {message.rating === 1
+                                                    ? <HandThumbsUpFill color="#ccc" size={20} />
+                                                    : <HandThumbsUp color="#ccc" size={20} />}
                                             </div>
-                                        </dd>
-                                    )}
-                                </dl>
-                                {index < chat_context.chatContext.length - 1 && <hr className="divider" />}
-                            </React.Fragment>
-                        ))
-                    )
-                    : (<p className={`empty`}><em className={`soft_text`}>{introText}</em></p>)
-            }
+                                            <div className={`vote down`} onClick={() => { handleClick(0, index) }}>
+                                                {message.rating === 0
+                                                    ? <HandThumbsDownFill color="#ccc" size={20} />
+                                                    : <HandThumbsDown color="#ccc" size={20} />}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </dd>
+                            )}
+                        </dl>
+                        {index < visibleMessages.length - 1 && <hr className="divider" />}
+                    </React.Fragment>
+                ))
+            ) : (
+                <p className={`empty`}><em className={`soft_text`}>{introText}</em></p>
+            )}
         </div>
     );
 };
