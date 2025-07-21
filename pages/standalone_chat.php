@@ -9,9 +9,8 @@ if (empty($initial_system_context)) {
 
 $globalUsername = $_SESSION['username'];
 if (!empty($globalUsername)) {
-    $initial_system_context = "Current username: {$globalUsername}\n\n" . $initial_system_context;
+    $initial_system_context = "The current user's name is: {$globalUsername}. Please personalize your replies by addressing them directly when appropriate.\n\n" . $initial_system_context;
 }
-
 $title = $module->getProjectSetting('project_chatbot_title') ?: $module->getSystemSetting('chatbot_title') ?: null;
 $intro_text = $module->getProjectSetting('project_chatbot_intro') ?: null;
 
@@ -33,6 +32,7 @@ $build_files    = $module->generateAssetFiles();
     window.cappy_project_config = {
         title: <?= json_encode($title) ?>,
         intro: <?= json_encode($intro_text) ?>,
+        current_user: <?=json_encode($globalUsername) ?>,
         allowed_context_types: <?= json_encode(
             array_map('trim', explode(',', $allowed_types))
         ) ?>,

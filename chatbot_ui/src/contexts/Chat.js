@@ -138,11 +138,16 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         const initialSystemContextArray = window.chatbot_jsmo_module.getInitialSystemContext();
         if (Array.isArray(initialSystemContextArray) && initialSystemContextArray.length > 0) {
             const initial_system_context = initialSystemContextArray.pop();
-            console.log("Initial API context is empty. Injecting system context before first query:", initial_system_context);
+            console.log("Injecting initial system context:", initial_system_context);
             addMessage(initial_system_context);
-        } else {
-            console.log("No initial system context available.");
-            // You can decide to proceed without it or handle this case as needed.
+
+            // 💡 Inject username as a user message
+            if (window.cappy_project_config?.current_user) {
+                addMessage({
+                    role: "user",
+                    content: `My name is ${window.cappy_project_config.current_user}. Please call me that in this chat.`
+                });
+            }
         }
 
         // Inject project context system message if present
