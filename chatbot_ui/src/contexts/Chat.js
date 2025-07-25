@@ -180,9 +180,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         console.log("calling callAI with ", wrappedPayload);
 
         window.chatbot_jsmo_module.callAI(wrappedPayload, (res) => {
-            console.log("what the fuck wheres my response", res);
             if (res && res.response) {
-                console.log("hello do i get in here? is it cause it starts with 2 invisible messages?");
                 if (payload.meta?.internal) {
                     // Inject only assistant message for internal triggers
                     addMessage({ role: 'assistant', content: res.response.content });
