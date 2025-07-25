@@ -10,16 +10,7 @@ function Header({ changeView }) {
     const [isFullScreen, setIsFullScreen] = useState(false);
 
     const toggleFullscreen = () => {
-        if (isFullScreen) {
-            window.parent.postMessage({
-            type: 'resize-cappy',
-            width: 360,
-            height: 520,
-            source: 'header-toggle'
-            }, '*');
-        } else {
-            window.parent.postMessage({ type: 'full-screen' }, '*');
-        }
+        window.parent.postMessage({ type: 'full-screen' }, '*');
         setIsFullScreen(!isFullScreen);
     };
     return (

@@ -103,6 +103,24 @@
             "type": "textarea"
         },
         {
+            "key": "project_expanded_width",
+            "name": "Expanded Chatbot Width (%/px)",
+            "required": false,
+            "type": "text"
+        },
+        {
+            "key": "project_expanded_height",
+            "name": "Expanded Chatbot Height (%/px)",
+            "required": false,
+            "type": "text"
+        },
+        {
+            "key": "hide_message_meta",
+            "name": "Don't show token usage or vote thumbs",
+            "required": false,
+            "type": "checkbox"
+        },
+        {
             "key": "project_chatbot_system_context",
             "name": "Raw text to inject into system context for Cappy",
             "required": false,

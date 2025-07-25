@@ -17,6 +17,10 @@ $intro_text = $module->getProjectSetting('project_chatbot_intro') ?: null;
 // Allowed postMessage context types (comma-separated)
 $allowed_types = $module->getProjectSetting('project_allowed_context_types') ?: '';
 
+$expanded_width  = $module->getProjectSetting('project_expanded_width') ?: null;
+$expanded_height = $module->getProjectSetting('project_expanded_height') ?: null;
+$hide_message_meta   = $module->getProjectSetting('hide_message_meta') ?: 0;
+
 $custom_css     = $module->getProjectSetting('project_chatbot_custom_css') ?? "";
 $build_files    = $module->generateAssetFiles();
 ?>
@@ -33,9 +37,12 @@ $build_files    = $module->generateAssetFiles();
         title: <?= json_encode($title) ?>,
         intro: <?= json_encode($intro_text) ?>,
         current_user: <?=json_encode($globalUsername) ?>,
+        expanded_width: <?= json_encode($expanded_width) ?>,
+        expanded_height: <?= json_encode($expanded_height) ?>,
         allowed_context_types: <?= json_encode(
             array_map('trim', explode(',', $allowed_types))
         ) ?>,
+        hide_message_meta: <?= json_encode($hide_message_meta)?>
     };
     </script>
     <?php 
@@ -56,7 +63,7 @@ $build_files    = $module->generateAssetFiles();
 <body>
     <div id="chatbot_ui_container"></div>
 <script>
-window.parent.postMessage("cappy-loaded", "*");
+    window.parent.postMessage("cappy-loaded", "*");
 </script>
 </body>
 </html>

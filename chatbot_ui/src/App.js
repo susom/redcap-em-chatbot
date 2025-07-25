@@ -12,17 +12,29 @@ import './assets/styles/global.css';
 function App() {
     const [currentView, setCurrentView] = useState('splash');
     const [defaultPosition, setDefaultPosition] = useState({ x: 0, y: 0 });
-    const [size, setSize] = useState({ width: 390, height: 300 }); // Default size for the UI
+
+    // Use config-defined defaults
+    const defaultExpandedWidth = window?.cappy_project_config?.expanded_width || 360;
+    const defaultExpandedHeight = window?.cappy_project_config?.expanded_height || 520;
+
+    const [size, setSize] = useState({
+        width: defaultExpandedWidth,
+        height: defaultExpandedHeight
+    });
 
     const isProjectContext = typeof window.cappy_project_config !== "undefined";
 
     const changeView = (viewName) => {
-        // Send resize instructions to parent
         if (viewName === 'splash') {
             window.parent.postMessage({ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }, '*');
-            setDefaultPosition({ x: 0, y: 0 });
         } else if (viewName === 'home' || viewName === 'history') {
-            window.parent.postMessage({ type: 'resize-cappy', source: viewName, width: 360, height: 520 }, '*');
+            const config = window?.cappy_project_config || {};
+            window.parent.postMessage({
+                type: 'resize-cappy',
+                source: viewName,
+                width: config.expanded_width || 360,
+                height: config.expanded_height || 520
+            }, '*');
         }
         setCurrentView(viewName);
     };

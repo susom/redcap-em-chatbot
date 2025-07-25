@@ -51,32 +51,36 @@ export const Messages = () => {
                 visibleMessages.map((message, index) => (
                     <React.Fragment key={index}>
                         <dl ref={index === visibleMessages.length - 1 ? newQaRef : null}>
-                            <dt>
-                                {message.user_content}
-                                <XCircleFill className="delete-icon" onClick={() => handleDelete(index)} />
-                            </dt>
+                            {message.user_content?.trim() && (
+                                <dt>
+                                    {message.user_content}
+                                    <XCircleFill className="delete-icon" onClick={() => handleDelete(index)} />
+                                </dt>
+                            )}
                             {message.assistant_content && (
-                                <dd>
+                                <dd className={`${!message.user_content?.trim() ? 'extratop_margin' : ''}`}>
                                     <ReactMarkdown>{message.assistant_content}</ReactMarkdown>
-                                    <div className={'msg_meta'}>
-                                        <div className={'token_usage'}>
-                                            <div>Input Tokens: {message.input_tokens}</div>
-                                            <div>Output Tokens: {message.output_tokens}</div>
-                                        </div>
-                                        <div className={`votes`}>
-                                            {chat_context.showRatingPO ? popoverOverlay : ""}
-                                            <div className={`vote up`} onClick={() => { handleClick(1, index) }}>
-                                                {message.rating === 1
-                                                    ? <HandThumbsUpFill color="#ccc" size={20} />
-                                                    : <HandThumbsUp color="#ccc" size={20} />}
+                                    {!window.cappy_project_config?.hide_message_meta && (
+                                        <div className={'msg_meta'}>
+                                            <div className={'token_usage'}>
+                                                <div>Input Tokens: {message.input_tokens}</div>
+                                                <div>Output Tokens: {message.output_tokens}</div>
                                             </div>
-                                            <div className={`vote down`} onClick={() => { handleClick(0, index) }}>
-                                                {message.rating === 0
-                                                    ? <HandThumbsDownFill color="#ccc" size={20} />
-                                                    : <HandThumbsDown color="#ccc" size={20} />}
+                                            <div className={`votes`}>
+                                                {chat_context.showRatingPO ? popoverOverlay : ""}
+                                                <div className={`vote up`} onClick={() => { handleClick(1, index) }}>
+                                                    {message.rating === 1
+                                                        ? <HandThumbsUpFill color="#ccc" size={20} />
+                                                        : <HandThumbsUp color="#ccc" size={20} />}
+                                                </div>
+                                                <div className={`vote down`} onClick={() => { handleClick(0, index) }}>
+                                                    {message.rating === 0
+                                                        ? <HandThumbsDownFill color="#ccc" size={20} />
+                                                        : <HandThumbsDown color="#ccc" size={20} />}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </dd>
                             )}
                         </dl>

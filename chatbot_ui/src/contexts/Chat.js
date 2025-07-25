@@ -17,10 +17,28 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     const DYNAMIC_CONTEXT_LABEL = "Active Project Context";
     const injectedUsername = useRef(false);
 
+    // useEffect(() => {
+    //     console.log("apiContext updated: ", apiContext);
+    // }, [apiContext]);
 
+    //ACCEPT POST MESSAGE FROM OUTSIDE TO INITIATE CAPPY MESSAGES!
     useEffect(() => {
-        console.log("apiContext updated: ", apiContext);
-    }, [apiContext]);
+        const handleInitiate = (event) => {
+            if (event.data?.type === 'cappy-initiate') {
+                const payload = {
+                    content: event.data.text,
+                    meta: event.data.meta || { internal: true }
+                };
+    
+                // Inject internal user message
+                addMessage({ role: 'user', content: payload.content, meta: payload.meta });
+                callAjax(payload, null, true);
+            }
+        };
+    
+        window.addEventListener('message', handleInitiate);
+        return () => window.removeEventListener('message', handleInitiate);
+    }, []);
 
     const updateApiContext = (newContext) => {
         apiContextRef.current = newContext;
@@ -137,7 +155,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         updateChatContext(session.queries, false);
     };
 
-    const callAjax = (payload, callback) => {
+    const callAjax = (payload, callback, skipAddMessage = false) => {
         if (!injectedUsername.current && window.cappy_project_config?.current_user) {
             console.log("Injecting username message...", window.cappy_project_config?.current_user);
             addMessage({
@@ -153,15 +171,24 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
             addMessage({ role: "system", content: DYNAMIC_CONTEXT_LABEL + ":\n" + projectContextRef.current });
         }
         
-        addMessage({ role: 'user', content: payload.content });
+        if (!skipAddMessage) {
+            addMessage({ role: 'user', content: payload.content, meta: payload.meta });
+        }
 
         const userMessageIndex = chatContextRef.current.length - 1;
         const wrappedPayload = [...apiContextRef.current];
         console.log("calling callAI with ", wrappedPayload);
 
         window.chatbot_jsmo_module.callAI(wrappedPayload, (res) => {
+            console.log("what the fuck wheres my response", res);
             if (res && res.response) {
-                updateMessage(res, userMessageIndex);
+                console.log("hello do i get in here? is it cause it starts with 2 invisible messages?");
+                if (payload.meta?.internal) {
+                    // Inject only assistant message for internal triggers
+                    addMessage({ role: 'assistant', content: res.response.content });
+                } else {
+                    updateMessage(res, userMessageIndex);
+                }
                 if (callback) callback();
             } else {
                 console.log("Unexpected response format:", res);

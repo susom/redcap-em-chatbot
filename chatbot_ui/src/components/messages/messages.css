@@ -63,6 +63,10 @@
     position: relative;
 }
 
+.messages dd.extratop_margin{
+    margin-top:30px;
+}
+
 .soft_text {
     color: #9DA5B1;
 }
