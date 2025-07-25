@@ -42,6 +42,18 @@
     display: none;
 }
 
+.footer .left-group {
+    display: flex;
+    align-items: center;
+    flex: 1;
+}
+
+.footer .user_input {
+    width: 100%; /* now fills remaining space in left-group */
+    padding-left: 10px;
+}
+  
+
 @keyframes rotate {
     from {
         transform: rotate(0deg);
