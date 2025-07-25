@@ -2,7 +2,7 @@ import React , {useState} from "react";
 import { Container } from 'react-bootstrap';
 import { Archive, ChatDots } from 'react-bootstrap-icons';
 import { ArrowsFullscreen } from 'react-bootstrap-icons'; 
-
+import { DashLg } from 'react-bootstrap-icons';
 import "./header.css";
 
 function Header({ changeView }) {
@@ -19,6 +19,9 @@ function Header({ changeView }) {
                 <span className="logo" onClick={() => changeView('splash')}></span>
                 {headerText}
                 
+                <button onClick={() => changeView('splash')} className="collapseit">
+                    <DashLg size={16} />
+                </button>
                 <button onClick={toggleFullscreen} className="fullscreen">
                     <ArrowsFullscreen size={16} />
                 </button>

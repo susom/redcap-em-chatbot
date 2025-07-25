@@ -15,8 +15,8 @@
     background: url("../../assets/images/redcap_logo.png") 0 50% no-repeat;
     background-size: 30px;
     display: inline-block;
-    width: 29px;
-    height: 29px;
+    width: 30px;
+    height: 30px;
     cursor: pointer;
     margin-right: 6px;
     vertical-align: bottom;
@@ -37,3 +37,7 @@
 .rcchat_header .fullscreen{
     margin-left: 0;
 } 
+
+.rcchat_header .collapseit {
+    margin-left:0;
+}
