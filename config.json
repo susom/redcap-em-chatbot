@@ -1,5 +1,5 @@
 {
-    "name": "Cappy - REDCap Support Bot",
+    "name": "Cappy - REDCap Chat Bot",
 
     "namespace": "Stanford\\REDCapChatBot",
 
@@ -235,6 +235,12 @@
     ],
 
     "system-settings": [
+        {
+            "key": "enable-system-ui-injection",
+            "name": "Enable Cappy UI (system-wide)",
+            "required": false,
+            "type": "checkbox"
+        },
         {
             "key": "llm-model",
             "name": "LLM Model",

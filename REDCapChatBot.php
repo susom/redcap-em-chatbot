@@ -30,6 +30,12 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     public function redcap_every_page_top($project_id) {
+        $sysEnabled = (string)$this->getSystemSetting('enable-system-ui-injection') === '1';
+        // If disabled and we're not inside a project with its own settings, stop immediately
+        if (!$sysEnabled && empty($project_id)) {
+            return;
+        }
+
         //THIS IS THE PROPER EXCLUDE LIST FOR CAPPY, comment out for now to make it function as INCLUDE so that i can limited test on prod
         //        try {
         //            // List of pages to exclude UI injection
