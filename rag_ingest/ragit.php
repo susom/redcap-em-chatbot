@@ -99,7 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['rag_files'])) {
                     'level' => $level,
                     'topics' => $topics,
                     'source_url' => $source_url,
-                    'file' => $name
+                    'file' => $name,
+                    'links' => $metadata['links'] ?? []
                 ];
                 $doc = $content . "\n\n(Metadata: " . json_encode($meta) . ")";
                 $rag->storeDocument($projectIdentifier, $title, $doc);
