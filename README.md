@@ -1,149 +1,165 @@
-# REDCap Chatbot EM
+# REDCap Chatbot External Module (EM)
 
-This External Module (EM) integrates a Support Chat Bot UI widget into Stanford REDCap.
-
----
-
-## About the Chatbot
-
-- Injects a React-based chat widget into REDCap project and/or system pages.
-- Supports dynamic project-specific context and system-level fallback.
-- Project-level settings can customize **title**, **intro message**, **model parameters**, and **dynamic postMessage context injection**.
-- Integrates with SecureChatAI (handles LLM backend calls) and RedcapRAG (retrieves relevant docs for better answers).
+A front-end chat widget for REDCap with optional RAG augmentation.  
+This module injects a React-based chatbot UI into REDCap pages and connects it to SecureChatAI (LLM backend) and, optionally, RedcapRAG (vector retrieval).
 
 ---
 
-## Integration and Dependencies
+## Features
 
-- [SecureChatAI External Module](https://github.com/susom/secureChatAI) (embedding and LLM orchestration)
-- [REDCap RAG External Module](https://github.com/susom/redcapRAG) (Optional) 
----
+### Chatbot UI
+- React widget injected on system or project pages.
+- Floating badge with expandable chat window.
+- Optional full-screen and draggable layout.
+- Customizable title, intro message, theme, and CSS overrides.
 
-## Setup & Configuration
+### Dynamic Context
+- Supports postMessage-based context injection.
+- Can combine project/system context with dynamic page-level context.
+- Optional retrieval-augmented generation (RAG) if RedcapRAG is installed.
 
-1. **Install Dependencies:**  
-   - SecureChatAI and RedcapRAG modules must be installed and enabled.
-
-2. **Build Assets:**  
-   - The widget is built with React; the build output is typically in `chatbot_ui/build/`.
-
-3. **Configure Project/System Settings:**  
-   - Project settings (override system defaults):
-     - `project_chatbot_title`
-     - `project_chatbot_intro`
-     - `project-llm-model`, `project-gpt-temperature`, etc.
-     - `project_allowed_context_types` (comma-separated, e.g. `project_detail,project_dashboard`)
-     - `project_chatbot_system_context`
-     - `project_chatbot_custom_css`
-   - System settings (global defaults):
-     - `llm-model`, `gpt-temperature`, etc.
-
-4. **Widget UI Injection:**
-   - Controlled via system setting `"chatbot_exclude_list"` (currently used as an *include* list for targeted testing).
-   - You can toggle injection for specific pages, projects, or everywhere.
+### LLM Support
+- All requests routed through SecureChatAI EM.
+- Supports GPT, Claude, Gemini, DeepSeek, and xAI (via SecureChatAI).
+- Configurable model and parameters at system or project level.
 
 ---
 
-## 📬 postMessage Communication
+## RAG Integration (Optional)
 
-### Outgoing Messages (from Chatbot App → Parent)
+If the RedcapRAG EM is installed and enabled, Chatbot EM retrieves relevant documents before generating an LLM answer.
 
-| Type             | Description                                  | Example Payload |
-|------------------|----------------------------------------------|------------------|
-| `resize-cappy`   | Ask parent to resize the iframe              | `{ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }` |
-| `full-screen`    | Request to expand the iframe fullscreen      | `{ type: 'full-screen' }` |
-| `collapse-cappy` | Ask parent to collapse back to badge size    | `{ type: 'collapse-cappy' }` |
-| `navigate`       | (From parent to chatbot, but chatbot may re-broadcast) Navigate to specific view | `{ type: 'navigate', view: 'home' }` |
+### Retrieval Flow
+1. User sends a message in the chat.
+2. Chatbot EM forwards the cleaned query to RedcapRAG.
+3. RedcapRAG performs:
+   - Dense similarity search (embeddings)
+   - Sparse BM25-style search (keyword)
+   - Hybrid scoring
+4. Top-K retrieved documents are returned to Chatbot EM.
+5. Chatbot embeds these documents into the final prompt passed to SecureChatAI.
 
-### Incoming Messages (Parent → Chatbot App)
+### RAG Payload Provided to SecureChatAI
 
-| Type                  | Description |
-|------------------------|-------------|
-| `collapse-cappy`       | Collapse widget to badge view (triggers `changeView('splash')`) |
-| `navigate`             | Switch to a specific chatbot view (e.g. `'home'`, `'history'`) |
-| Custom types (e.g. `project_detail`, `project_dashboard`, etc.) | Injected Dynamic project context  |
-
-
----
-
-## Dynamic Project Context (postMessage Injection)
-
-- Supports postMessage-based context injection for embedding the chatbot in iframes or custom dashboards.
-- Allowed custom event types are set in `project_allowed_context_types` em project setting (comma-separated).
-- Frontend listens for `postMessage` events of these types to update the chat context.
-- **If you embed the chatbot, document which event types to use for context.**
-
-
----
-
-
-```
-+-------------------+             postMessage             +----------------------+
-|                   |----------------------------------->|                      |
-|  Chatbot iframe   |                                    |   Parent REDCap page |
-|   (React app)     |<-----------------------------------|     (root.php)       |
-|                   |         postMessage listener       |                      |
-+-------------------+                                    +----------------------+
-        |                                                      ^
-        |                                                      |
-        | changeView('home')                                   |
-        |   └─> postMessage: { type: 'resize-cappy', ... }      |
-        |                                                      |
-        | click "fullscreen"                                   |
-        |   └─> postMessage: { type: 'full-screen' }            |
-        |                                                      |
-        | receives:                                            |
-        |   - { type: 'collapse-cappy' } → changeView('splash')|
-        |   - { type: 'navigate', view: 'home' }               |
-        |   - { type: 'project_detail', ... }                  |
-        v                                                      |
-+-------------------+                                          |
-|  Internal Logic    |<-----------------------------------------+
-|  + Header buttons  |
-|  + Draggable + Resizable
-+-------------------+
+```json
+{
+  "query": "user question",
+  "rag_context": [
+    {
+      "id": "...",
+      "dense": 0.84,
+      "sparse": 0.91,
+      "similarity": 0.87,
+      "content": "First part of the retrieved document..."
+    }
+  ]
+}
 ```
 
+### Required Setting
+
+In Chatbot EM Project Settings:
+
+- `project_rag_project_identifier`  
+  The namespace identifier that RedcapRAG uses for document retrieval.
+
+If this setting is empty, RAG is skipped entirely.
+
+---
+
+## Dependencies
+
+- SecureChatAI External Module  
+  Handles all LLM interactions, model parameters, and defaults.
+
+- RedcapRAG External Module (optional)  
+  Provides ingestion, hybrid vector search, and document retrieval.  
+  Chatbot EM does not manage ingestion; it only calls RAG helper functions.
+
+---
+
+## Setup
+
+### 1. Install Dependencies
+Enable SecureChatAI.  
+Enable RedcapRAG if you want RAG retrieval.
+
+### 2. Build / Deploy React Widget
+The compiled UI bundle should be located in:
+
+```
+chatbot_ui/build/
+```
+
+The module injects these assets automatically.
+
+### 3. Configure Project Settings
+
+Configurable fields include:
+- Chatbot title
+- Intro message
+- System or project context blocks
+- Custom CSS overrides
+- Model and model parameters
+- Allowed postMessage event types
+- RAG namespace (optional)
+
+---
+
+## postMessage Integration
+
+Chatbot EM listens for messages from the parent page.  
+Use this to provide page-specific or record-specific context.
+
+Supported message types:
+- `collapse-cappy`
+- `navigate`
+- Custom types defined in `project_allowed_context_types`
+
+Example:
+
+```javascript
+window.postMessage({
+  type: "project_detail",
+  data: {
+    record_id: 123,
+    demographics: { ... }
+  }
+}, "*");
+```
+
+The chatbot will incorporate this data into its next LLM request.
 
 ---
 
 ## Model Parameter Handling
 
-- **Model parameters** (`model`, `temperature`, `top_p`, `frequency_penalty`, `presence_penalty`, `max_tokens`, `reasoning`) are looked up in project settings, then system settings, then fallback to SecureChatAI internal defaults.
-- **Only non-empty values are sent**—blank settings are omitted, avoiding unwanted zeroes or empty strings.
-- **Reasoning Effort** is only sent to models that support it (`o1`, `o3-mini`).
+- Project-level settings override system defaults.
+- Empty settings are omitted to avoid sending blank parameters.
+- Reasoning effort is only included for models that support it.
+- Final parameter resolution is handled by SecureChatAI EM.
 
 ---
 
-## Gotchas & Tips
+## Tips and Notes
 
-- **Model Parameter Naming:**  
-  - System-level: `llm-model`, `gpt-temperature`, etc.
-  - Project-level: `project-llm-model`, `project-gpt-temperature`, etc.
-  - Always use the provided `getSetting()` method to handle fallback logic.
-
-- **Frontend postMessage:**  
-  - The allowed types must be in your project settings.
-  - Widget supports switching context dynamically via postMessage—useful for dashboards or embedded contexts.
+- RedcapRAG is optional; leave the namespace blank to disable retrieval.
+- Chatbot EM does not ingest documents. Use RedcapRAG admin UI for ingestion.
+- Dynamic context via postMessage is powerful for dashboards and embedded workflows.
+- Use RedcapRAG's debug panel to test hybrid search relevance.
+- Chatbot EM respects the `chatbot_exclude_list`, which currently acts as an inclusion list during testing.
 
 ---
 
-## Example: Enabling the Chatbot on a Project
+## Example Workflow
 
-1. Enable REDCap Chatbot, SecureChatAI, and RedcapRAG on your REDCap project.
-2. In Project Settings for Chatbot EM, set:
-   - **Chatbot Title**
-   - **Intro Message**
-   - **Model and parameters**
-   - **Allowed postMessage event types**
-   - (Optional) Custom CSS
-
-3. To send custom project context via iframe:
-    ```js
-    window.parent.postMessage({
-      type: 'project_detail',
-      projectContext: { ... }
-    }, '*');
-    ```
-    (where `'project_detail'` is one of your allowed types)
+1. User asks a question.
+2. Chatbot EM gathers:
+   - System context
+   - Project context
+   - Dynamic postMessage context
+3. If RedcapRAG is enabled:
+   - Relevant documents are retrieved and included.
+4. SecureChatAI merges all context and sends it to the selected LLM.
+5. The LLM produces the final answer, optionally grounded in retrieved documents.
 
