@@ -1,41 +1,312 @@
 <?php
 /** @var \Stanford\REDCapChatBot\REDCapChatBot $module */
-$rag = $module->getRedcapRAGInstance();
-$projectIdentifier = $module->getSetting("project_rag_project_identifier");
-?>
 
-<!DOCTYPE html>
+// Basic access control (tighten if needed)
+if (!SUPER_USER && !USERID) {
+    exit("Access denied");
+}
+
+$rag               = $module->getRedcapRAGInstance();
+$projectIdentifier = $module->getSetting("project_rag_project_identifier");
+
+if (!$projectIdentifier) {
+    echo "<h2>No RAG project identifier configured.</h2>";
+    exit;
+}
+
+$action    = $_POST['action'] ?? null;
+$results   = null;
+$rows      = [];
+$ingestLog = "";
+
+// Heat-map helper for scores
+function ragScoreClass(?float $val): string {
+    if ($val === null) return '';
+    if ($val >= 0.85)   return 'score-high';
+    if ($val >= 0.7)    return 'score-mid';
+    return 'score-low';
+}
+
+// Decide default active tab
+$activeTab = 'ingest';
+if ($action === 'search') {
+    $activeTab = 'search';
+} elseif (in_array($action, ['delete', 'purge'], true)) {
+    $activeTab = 'docs';
+} elseif ($action === 'ingest') {
+    $activeTab = 'ingest';
+}
+
+// Handle POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    // Ingest JSON files into RAG
+    if ($action === 'ingest' && isset($_FILES['rag_files'])) {
+        $ingestLog .= "Processing Uploaded Files...\n\n";
+
+        if (!$rag) {
+            $ingestLog .= "Error: Could not load RedcapRAG EM instance.\n";
+        } else {
+            $files = $_FILES['rag_files'];
+
+            $count = is_array($files['name']) ? count($files['name']) : 0;
+
+            for ($i = 0; $i < $count; $i++) {
+                $name = $files['name'][$i];
+                $tmp  = $files['tmp_name'][$i];
+
+                if (!is_uploaded_file($tmp)) {
+                    $ingestLog .= "File: {$name}\n  ❌ Upload error. Skipping.\n\n";
+                    continue;
+                }
+
+                $ingestLog .= "File: {$name}\n";
+
+                $raw = file_get_contents($tmp);
+                $json = json_decode($raw, true);
+
+                if (!$json) {
+                    $ingestLog .= "  ❌ Failed to parse JSON. Skipping.\n\n";
+                    continue;
+                }
+
+                $sections   = $json['content']['structured_sections'] ?? [];
+                $metadata   = $json['metadata'] ?? [];
+                $topics     = $metadata['topics'] ?? [];
+                $source_url = $json['source_url'] ?? '';
+
+                // Sections → individual documents
+                foreach ($sections as $section) {
+                    $title   = $section['heading'] ?? 'Untitled Section';
+                    $content = $section['content'] ?? '';
+                    $points  = $section['points'] ?? [];
+
+                    if (!empty($points)) {
+                        $content .= "\n\nPoints:\n- " . implode("\n- ", $points);
+                    }
+
+                    $level = $section['level'] ?? null;
+                    $meta  = [
+                        'level'      => $level,
+                        'topics'     => $topics,
+                        'source_url' => $source_url,
+                        'file'       => $name,
+                        'links'      => $metadata['links'] ?? [],
+                    ];
+                    $doc = $content . "\n\n(Metadata: " . json_encode($meta) . ")";
+                    $rag->storeDocument($projectIdentifier, $title, $doc);
+                }
+
+                // Tables → separate documents
+                $tables = $json['content']['tables'] ?? [];
+                foreach ($tables as $table) {
+                    $caption = $table['title'] ?? 'Table';
+                    $headers = implode(" | ", $table['headers'] ?? []);
+                    $rowsTbl = implode("\n", array_map(
+                        fn($r) => implode(" | ", $r),
+                        $table['rows'] ?? []
+                    ));
+                    $table_content = "$caption\n$headers\n$rowsTbl";
+
+                    $meta = [
+                        'type'       => 'table',
+                        'source_url' => $source_url,
+                        'file'       => $name,
+                    ];
+                    $doc = $table_content . "\n\n(Metadata: " . json_encode($meta) . ")";
+                    $rag->storeDocument($projectIdentifier, $caption, $doc);
+                }
+
+                $ingestLog .= "  ✅ Finished ingesting {$name}\n\n";
+            }
+        }
+
+        $ingestLog .= "All ingestion complete.\n";
+    }
+
+    // Delete single doc
+    if ($action === 'delete' && !empty($_POST['doc_id'])) {
+        $rag->deleteContextDocument($projectIdentifier, $_POST['doc_id']);
+        header("Location: " . $_SERVER['REQUEST_URI']);
+        exit;
+    }
+
+    // Purge namespace
+    if (
+        $action === 'purge' &&
+        !empty($_POST['confirm']) &&
+        $_POST['confirm'] === $projectIdentifier
+    ) {
+        $rag->purgeContextNamespace($projectIdentifier);
+        header("Location: " . $_SERVER['REQUEST_URI']);
+        exit;
+    }
+
+    // Search (hybrid dense+sparse)
+    if ($action === 'search' && !empty($_POST['query'])) {
+        $results = $rag->debugSearchContext($projectIdentifier, $_POST['query'], 3);
+    }
+}
+
+// Always refresh docs for Docs tab
+$rows = $rag->listContextDocuments($projectIdentifier);
+?>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Cappy RAG Ingestion</title>
-  <style>
-    body { font-family: sans-serif; padding: 2rem; max-width: 700px; margin: auto; }
-    h2 { margin-bottom: 0.25em; }
-    input[type="file"] { margin: 1em 0; }
-    pre.template { background: #f4f4f4; padding: 1em; white-space: pre-wrap; word-break: break-word; }
-    .result { margin-top: 2em; white-space: pre-wrap; font-family: monospace; background: #f9f9f9; padding: 1em; border-left: 4px solid #ccc; }
-  </style>
+    <meta charset="utf-8">
+    <title>Cappy RAG Tools</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap 5 -->
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+        crossorigin="anonymous"
+    >
+    <style>
+        body {
+            padding: 20px;
+        }
+        .score-high { background: #d4edda; }
+        .score-mid  { background: #fff3cd; }
+        .score-low  { background: #f8d7da; }
+
+        th[data-sort-key] {
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        th[data-sort-key]::after {
+            content: ' ⇅';
+            font-size: 0.75rem;
+            color: #999;
+        }
+        .table-fixed-header thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa;
+            z-index: 2;
+        }
+        .content-preview {
+            font-family: monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 480px;
+        }
+        pre.small-pre {
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+        }
+    </style>
 </head>
 <body>
-<h2>Cappy RAG Ingestion</h2>
 
-<p>
-  This will ingest RAG documents into the scope of this project:
-</p>
-<ul>
-  <li><strong>Project Identifier:</strong> <code><?= htmlspecialchars($projectIdentifier) ?></code></li>
-</ul>
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">Cappy RAG Tools</h2>
+            <div class="text-muted small">
+                Namespace: <code><?= htmlspecialchars($projectIdentifier) ?></code>
+            </div>
+        </div>
+        <span class="badge bg-secondary align-self-start mt-2">Hybrid Dense + Sparse</span>
+    </div>
 
-<form method="POST" enctype="multipart/form-data">
-  <input type="hidden" name="redcap_csrf_token" value="<?= $module->getCSRFToken() ?>">
-  <label>Select one or more <code>.json</code> files to ingest:</label><br>
-  <input type="file" name="rag_files[]" accept=".json" multiple required><br>
-  <button type="submit">Upload & Ingest</button>
-</form>
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-3" id="ragTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link <?= $activeTab === 'ingest' ? 'active' : '' ?>"
+                id="tab-ingest"
+                data-bs-toggle="tab"
+                data-bs-target="#pane-ingest"
+                type="button"
+                role="tab"
+                aria-controls="pane-ingest"
+                aria-selected="<?= $activeTab === 'ingest' ? 'true' : 'false' ?>"
+            >
+                Ingest JSON
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link <?= $activeTab === 'search' ? 'active' : '' ?>"
+                id="tab-search"
+                data-bs-toggle="tab"
+                data-bs-target="#pane-search"
+                type="button"
+                role="tab"
+                aria-controls="pane-search"
+                aria-selected="<?= $activeTab === 'search' ? 'true' : 'false' ?>"
+            >
+                Search / Debug
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button
+                class="nav-link <?= $activeTab === 'docs' ? 'active' : '' ?>"
+                id="tab-docs"
+                data-bs-toggle="tab"
+                data-bs-target="#pane-docs"
+                type="button"
+                role="tab"
+                aria-controls="pane-docs"
+                aria-selected="<?= $activeTab === 'docs' ? 'true' : 'false' ?>"
+            >
+                Stored Docs / Purge
+            </button>
+        </li>
+    </ul>
 
-<h3>JSON File Template</h3>
-<pre class="template">
+    <div class="tab-content" id="ragTabContent">
+
+        <!-- Ingest Tab -->
+        <div
+            class="tab-pane fade <?= $activeTab === 'ingest' ? 'show active' : '' ?>"
+            id="pane-ingest"
+            role="tabpanel"
+            aria-labelledby="tab-ingest"
+        >
+            <div class="card shadow-sm mb-3">
+                <div class="card-header">
+                    <strong>Cappy RAG Ingestion</strong>
+                </div>
+                <div class="card-body">
+                    <p>
+                        This ingests JSON RAG documents into the scope of this project:
+                    </p>
+                    <ul>
+                        <li>
+                            <strong>Project Identifier:</strong>
+                            <code><?= htmlspecialchars($projectIdentifier) ?></code>
+                        </li>
+                    </ul>
+
+                    <form method="POST" enctype="multipart/form-data" class="mb-3">
+                        <input type="hidden" name="redcap_csrf_token" value="<?= $module->getCSRFToken() ?>">
+                        <input type="hidden" name="action" value="ingest">
+                        <div class="mb-2">
+                            <label class="form-label">
+                                Select one or more <code>.json</code> files to ingest:
+                            </label>
+                            <input
+                                type="file"
+                                name="rag_files[]"
+                                accept=".json"
+                                multiple
+                                required
+                                class="form-control"
+                            >
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            Upload &amp; Ingest
+                        </button>
+                    </form>
+
+                    <h6>JSON File Template</h6>
+                    <pre class="border rounded p-2 bg-light small-pre">
 {
   "source_url": "https://example.com/doc.html",
   "metadata": {
@@ -58,76 +329,330 @@ $projectIdentifier = $module->getSetting("project_rag_project_identifier");
     ]
   }
 }
-</pre>
+                    </pre>
 
-<?php
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['rag_files'])) {
-    echo "<div class='result'><strong>Processing Uploaded Files...</strong>\n\n";
+                    <?php if (!empty($ingestLog)): ?>
+                        <div class="alert alert-secondary mt-3 mb-0">
+                            <pre class="small-pre mb-0"><?= htmlspecialchars($ingestLog) ?></pre>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
 
-    if (!$rag) {
-        echo "Error: Could not load RedcapRAG EM instance.\n";
-    } else {
-        $files = $_FILES['rag_files'];
+        <!-- Search / Debug Tab -->
+        <div
+            class="tab-pane fade <?= $activeTab === 'search' ? 'show active' : '' ?>"
+            id="pane-search"
+            role="tabpanel"
+            aria-labelledby="tab-search"
+        >
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <strong>Vector Search Test</strong>
+                </div>
+                <div class="card-body">
+                    <form method="post" class="row g-2 align-items-center mb-2">
+                        <input type="hidden" name="redcap_csrf_token" value="<?= $module->getCSRFToken() ?>">
+                        <input type="hidden" name="action" value="search">
+                        <div class="col-12 col-md-9">
+                            <input
+                                type="text"
+                                name="query"
+                                class="form-control"
+                                placeholder="Enter test query text"
+                                value="<?= isset($_POST['query']) && $action === 'search'
+                                    ? htmlspecialchars($_POST['query'])
+                                    : '' ?>"
+                            >
+                        </div>
+                        <div class="col-12 col-md-3 d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                Run Search
+                            </button>
+                        </div>
+                    </form>
 
-        for ($i = 0; $i < count($files['name']); $i++) {
-            $name = $files['name'][$i];
-            $tmp = $files['tmp_name'][$i];
+                    <?php if (is_array($results)): ?>
+                        <hr class="mt-3 mb-2">
+                        <h6 class="fw-semibold">
+                            Search Results
+                            <?php if (!empty($_POST['query']) && $action === 'search'): ?>
+                                <small class="text-muted">
+                                    for "<?= htmlspecialchars($_POST['query']) ?>"
+                                </small>
+                            <?php endif; ?>
+                        </h6>
 
-            echo "File: $name\n";
+                        <?php if (count($results)): ?>
+                            <div class="table-responsive mt-2">
+                                <table class="table table-sm table-hover table-fixed-header align-middle mb-0" id="results-table">
+                                    <thead>
+                                    <tr>
+                                        <th data-sort-key="id" data-sort-type="string">ID</th>
+                                        <th data-sort-key="dense" data-sort-type="number">Dense</th>
+                                        <th data-sort-key="sparse" data-sort-type="number">Sparse</th>
+                                        <th data-sort-key="similarity" data-sort-type="number">Similarity</th>
+                                        <th>Content (first 140 chars)</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <?php foreach ($results as $r): ?>
+                                        <?php
+                                        $dense      = isset($r['dense']) ? (float)$r['dense'] : null;
+                                        $sparse     = isset($r['sparse']) ? (float)$r['sparse'] : null;
+                                        $similarity = isset($r['similarity']) ? (float)$r['similarity'] : null;
+                                        ?>
+                                        <tr
+                                            data-id="<?= htmlspecialchars($r['id']) ?>"
+                                            data-dense="<?= $dense !== null ? $dense : '' ?>"
+                                            data-sparse="<?= $sparse !== null ? $sparse : '' ?>"
+                                            data-similarity="<?= $similarity !== null ? $similarity : '' ?>"
+                                        >
+                                            <td class="small text-monospace">
+                                                <?= htmlspecialchars($r['id']) ?>
+                                            </td>
+                                            <td class="<?= ragScoreClass($dense) ?>">
+                                                <?= $dense !== null ? round($dense, 4) : '-' ?>
+                                            </td>
+                                            <td class="<?= ragScoreClass($sparse) ?>">
+                                                <?= $sparse !== null ? round($sparse, 4) : '-' ?>
+                                            </td>
+                                            <td class="<?= ragScoreClass($similarity) ?>">
+                                                <?= $similarity !== null ? round($similarity, 4) : '-' ?>
+                                            </td>
+                                            <td class="small">
+                                                <?= htmlspecialchars(substr($r['content'], 0, 140)) ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-secondary mt-3 mb-0">No matches.</div>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
 
-            $json = json_decode(file_get_contents($tmp), true);
-            if (!$json) {
-                echo "  ❌ Failed to parse JSON. Skipping.\n";
-                continue;
-            }
+        <!-- Docs / Purge Tab -->
+        <div
+            class="tab-pane fade <?= $activeTab === 'docs' ? 'show active' : '' ?>"
+            id="pane-docs"
+            role="tabpanel"
+            aria-labelledby="tab-docs"
+        >
+            <div class="row g-3">
+                <div class="col-12">
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header">
+                            <strong>Namespace Maintenance</strong>
+                        </div>
+                        <div class="card-body">
+                            <form method="post" class="row g-2 align-items-center">
+                                <input type="hidden" name="redcap_csrf_token" value="<?= $module->getCSRFToken() ?>">
+                                <input type="hidden" name="action" value="purge">
+                                <div class="col-12 col-md-7 small">
+                                    <label class="form-label mb-1">
+                                        Type the namespace to purge all vectors:
+                                    </label>
+                                    <input
+                                        type="text"
+                                        name="confirm"
+                                        class="form-control form-control-sm"
+                                        placeholder="<?= htmlspecialchars($projectIdentifier) ?>"
+                                    >
+                                </div>
+                                <div class="col-12 col-md-5 d-grid mt-3 mt-md-4">
+                                    <button
+                                        type="submit"
+                                        class="btn btn-outline-danger btn-sm"
+                                        onclick="return confirm('This will delete all vectors in this namespace. Continue?');"
+                                    >
+                                        Purge Namespace
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
 
-            $sections = $json['content']['structured_sections'] ?? [];
-            $metadata = $json['metadata'] ?? [];
-            $topics = $metadata['topics'] ?? [];
-            $source_url = $json['source_url'] ?? '';
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong>Stored Documents</strong>
+                            <span class="badge bg-light text-dark">
+                                <?= count($rows) ?> records
+                            </span>
+                        </div>
+                        <div class="card-body p-0">
+                            <?php if (count($rows)): ?>
+                                <div class="table-responsive" style="max-height: 420px;">
+                                    <table class="table table-sm table-hover table-fixed-header align-middle mb-0" id="docs-table">
+                                        <thead>
+                                        <tr>
+                                            <th data-sort-key="id" data-sort-type="string">ID</th>
+                                            <th data-sort-key="source" data-sort-type="string">Source</th>
+                                            <th>Content</th>
+                                            <th style="width:130px;">Actions</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        <?php foreach ($rows as $idx => $r): ?>
+                                            <?php
+                                            $rowId      = htmlspecialchars($r['id']);
+                                            $collapseId = 'docDetails_' . $idx;
+                                            ?>
+                                            <tr
+                                                data-id="<?= $rowId ?>"
+                                                data-source="<?= htmlspecialchars($r['source'] ?? '') ?>"
+                                            >
+                                                <td class="small text-monospace"><?= $rowId ?></td>
+                                                <td><?= htmlspecialchars($r['source'] ?? '') ?></td>
+                                                <td class="content-preview small">
+                                                    <?= htmlspecialchars(substr($r['content'], 0, 120)) ?>
+                                                </td>
+                                                <td>
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-outline-secondary toggle-details"
+                                                            data-bs-target="#<?= $collapseId ?>"
+                                                        >
+                                                            View
+                                                        </button>
+                                                        <form method="post" style="display:inline;">
+                                                            <input type="hidden" name="action" value="delete">
+                                                            <input type="hidden" name="redcap_csrf_token" value="<?= $module->getCSRFToken() ?>">
+                                                            <input type="hidden" name="doc_id" value="<?= $rowId ?>">
+                                                            <button
+                                                                type="submit"
+                                                                class="btn btn-outline-danger"
+                                                                onclick="return confirm('Delete this document from the namespace?');"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <tr class="table-light">
+                                                <td colspan="4" class="p-0">
+                                                    <div
+                                                        id="<?= $collapseId ?>"
+                                                        class="collapse border-top small px-3 py-2"
+                                                    >
+                                                        <div class="fw-semibold mb-1">Full Content</div>
+                                                        <pre class="mb-2" style="white-space:pre-wrap; font-size:11px;"><?= htmlspecialchars($r['content']) ?></pre>
+                                                        <div class="text-muted small">
+                                                            <strong>Source:</strong> <?= htmlspecialchars($r['source'] ?? '') ?>
+                                                            <?php if (!empty($r['meta_timestamp'])): ?>
+                                                                &nbsp; | &nbsp;
+                                                                <strong>Timestamp:</strong> <?= htmlspecialchars($r['meta_timestamp']) ?>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            <?php else: ?>
+                                <div class="p-3">
+                                    <em class="text-muted">No stored context documents.</em>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-            foreach ($sections as $section) {
-                $title = $section['heading'] ?? 'Untitled Section';
-                $content = $section['content'] ?? '';
-                $points = $section['points'] ?? [];
-                if (!empty($points)) {
-                    $content .= "\n\nPoints:\n- " . implode("\n- ", $points);
-                }
+    </div><!-- /.tab-content -->
+</div><!-- /.container-fluid -->
 
-                $level = $section['level'] ?? null;
-                $meta = [
-                    'level' => $level,
-                    'topics' => $topics,
-                    'source_url' => $source_url,
-                    'file' => $name,
-                    'links' => $metadata['links'] ?? []
-                ];
-                $doc = $content . "\n\n(Metadata: " . json_encode($meta) . ")";
-                $rag->storeDocument($projectIdentifier, $title, $doc);
-            }
+<!-- Bootstrap JS bundle -->
+<script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+    crossorigin="anonymous"
+></script>
 
-            $tables = $json['content']['tables'] ?? [];
-            foreach ($tables as $table) {
-                $caption = $table['title'] ?? 'Table';
-                $headers = implode(" | ", $table['headers'] ?? []);
-                $rows = implode("\n", array_map(fn($r) => implode(" | ", $r), $table['rows'] ?? []));
-                $table_content = "$caption\n$headers\n$rows";
-                $meta = [
-                    'type' => 'table',
-                    'source_url' => $source_url,
-                    'file' => $name
-                ];
-                $doc = $table_content . "\n\n(Metadata: " . json_encode($meta) . ")";
-                $rag->storeDocument($projectIdentifier, $caption, $doc);
-            }
-
-            echo "  ✅ Finished ingesting $name\n\n";
+<script>
+// Tab persistence via URL hash
+document.addEventListener('DOMContentLoaded', function () {
+    const hash = window.location.hash;
+    if (hash) {
+        const trigger = document.querySelector(`#ragTab [data-bs-target="${hash}"]`);
+        if (trigger) {
+            const tab = new bootstrap.Tab(trigger);
+            tab.show();
         }
     }
 
-    echo "All ingestion complete.</div>";
-}
-?>
+    document.querySelectorAll('#ragTab [data-bs-toggle="tab"]').forEach(function (btn) {
+        btn.addEventListener('shown.bs.tab', function (event) {
+            const target = event.target.getAttribute('data-bs-target');
+            if (target) {
+                history.replaceState(null, '', target);
+            }
+        });
+    });
+
+    // Simple table sorting for any table with th[data-sort-key]
+    document.querySelectorAll('th[data-sort-key]').forEach(function (th) {
+        th.addEventListener('click', function () {
+            const table   = th.closest('table');
+            const tbody   = table.querySelector('tbody');
+            const key     = th.dataset.sortKey;
+            const isNumeric = th.dataset.sortType === 'number';
+            const currentDir = th.dataset.sortDir || 'asc';
+            const newDir     = currentDir === 'asc' ? 'desc' : 'asc';
+            th.dataset.sortDir = newDir;
+
+            const rows = Array.from(tbody.querySelectorAll('tr')).filter(function (row) {
+                // Skip detail rows in docs table
+                return !row.querySelector('.collapse');
+            });
+
+            rows.sort(function (a, b) {
+                const aVal = a.dataset[key] || '';
+                const bVal = b.dataset[key] || '';
+
+                let cmp;
+                if (isNumeric) {
+                    const aNum = parseFloat(aVal) || 0;
+                    const bNum = parseFloat(bVal) || 0;
+                    cmp = aNum - bNum;
+                } else {
+                    cmp = aVal.localeCompare(bVal);
+                }
+
+                return newDir === 'asc' ? cmp : -cmp;
+            });
+
+            rows.forEach(function (row) {
+                tbody.insertBefore(row, tbody.firstChild);
+            });
+        });
+    });
+
+    // Collapsible "View" buttons for stored docs
+    document.querySelectorAll('.toggle-details').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const targetId = btn.getAttribute('data-bs-target');
+            if (!targetId) return;
+            const el = document.querySelector(targetId);
+            if (!el) return;
+            const c = bootstrap.Collapse.getOrCreateInstance(el);
+            c.toggle();
+        });
+    });
+});
+</script>
 
 </body>
 </html>
