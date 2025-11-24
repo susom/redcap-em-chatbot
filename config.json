@@ -29,7 +29,7 @@
                 "show-header-and-footer": false
             },
             {
-                "name": "Project Chatbot RAG Ingestor",
+                "name": "Project Chatbot RAG Tools",
                 "icon": "fa-solid fa-gear",
                 "url": "rag_ingest/ragit.php",
                 "show-header-and-footer": false

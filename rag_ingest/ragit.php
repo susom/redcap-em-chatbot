@@ -42,6 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Ingest JSON files into RAG
     if ($action === 'ingest' && isset($_FILES['rag_files'])) {
+        set_time_limit(300);
+
         $ingestLog .= "Processing Uploaded Files...\n\n";
 
         if (!$rag) {
@@ -49,8 +51,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $files = $_FILES['rag_files'];
 
+            $maxFiles = 5;
             $count = is_array($files['name']) ? count($files['name']) : 0;
 
+            if ($count > $maxFiles) {
+                $ingestLog .= "You uploaded {$count} files. Only the first {$maxFiles} will be processed.\n\n";
+                $count = $maxFiles;
+            }
+            
             for ($i = 0; $i < $count; $i++) {
                 $name = $files['name'][$i];
                 $tmp  = $files['tmp_name'][$i];
