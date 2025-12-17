@@ -80,6 +80,12 @@
             "type": "text"
         },
         {
+            "key": "agent_mode",
+            "name": "<b>Enable Agent Mode</b><br><i>(experimental)</i> Allows the chatbot to use multi-step agentic workflows with tool execution.",
+            "required": false,
+            "type": "checkbox"
+        },
+        {
             "key": "project_rag_project_identifier",
             "name": "RAG Scope identifier",
             "required": false,

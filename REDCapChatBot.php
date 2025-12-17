@@ -412,7 +412,11 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $this->setIfNotBlank($override_params, "presence_penalty", $this->getSetting("project-gpt-presence-penalty"), 'float');
                 $this->setIfNotBlank($override_params, "max_tokens", $this->getSetting("project-gpt-max-tokens"), 'int');
                 $this->setIfNotBlank($override_params, "reasoning", $this->getSetting("project-reasoning-effort"));
-
+                
+                $agent_mode = (bool) $this->getSetting("agent_mode");
+                if ($agent_mode) {
+                    $override_params["agent_mode"] = true;
+                }
                 $response = $this->getSecureChatInstance()->callAI($model, $override_params);
                 $result = $this->formatResponse($response);
 
