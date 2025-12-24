@@ -417,7 +417,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 if ($agent_mode) {
                     $override_params["agent_mode"] = true;
                 }
-                $response = $this->getSecureChatInstance()->callAI($model, $override_params);
+                $response = $this->getSecureChatInstance()->callAI($model, $override_params, $project_id);
                 $result = $this->formatResponse($response);
 
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
