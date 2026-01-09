@@ -326,12 +326,6 @@
             "type": "textarea"
         },
         {
-            "key": "redcap_actions_list",
-            "name": "List of potential programmatic actions Cappy can perform",
-            "required": false,
-            "type": "textarea"
-        },
-        {
             "key": "chatbot_exclude_list",
             "name": "Comma delimited list of URL fragments to exclude Cappy",
             "required": false,

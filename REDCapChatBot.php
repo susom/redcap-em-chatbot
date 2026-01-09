@@ -383,20 +383,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     }
                 }
 
-                //Add REDCap actions list to the system context
-                $actions_list_json = $this->getSystemSetting('redcap_actions_list');
-                if (!empty($actions_list_json)) {
-                    $actions_list = json_decode($actions_list_json, true);
-                    if (json_last_error() === JSON_ERROR_NONE) {
-                        $actions_context = "Possible Actions:\n" . json_encode($actions_list, JSON_PRETTY_PRINT);
-                        $messages = $this->appendSystemContext($messages, $actions_context);
-                    }
-
-                    // Inject additional instruction for action matching and sentiment analysis
-                    $action_matching_context = "Analyze the user's query to determine its intent, match it to the appropriate REDCap action from the provided list (only if relevant!), and determine the sentiment on a scale of 1 to 5 (where 1 is very negative and 5 is very positive). Include this in the response.";
-                    $messages = $this->appendSystemContext($messages, $action_matching_context);
-                }
-
                 //FIND AND INJECT RAG TOO
                 $ragContext = $this->getRedcapRAGInstance()?->getRelevantDocuments($rag_project_identifier, $messages) ?? [];
                 foreach ($ragContext as $doc) {

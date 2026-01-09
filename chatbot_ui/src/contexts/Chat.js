@@ -16,7 +16,13 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     const chatContextRef = useRef(chatContext);
 
     const DYNAMIC_CONTEXT_LABEL = "Active Project Context";
+    const CONVERSATION_SUMMARY_LABEL = "Previous Conversation Summary";
     const injectedUsername = useRef(false);
+
+    // Context compression settings
+    const COMPRESSION_THRESHOLD = 20; // Trigger compression after 20 messages
+    const KEEP_RECENT_MESSAGES = 6;   // Keep last 6 messages (3 Q&A pairs)
+    const SUMMARIZATION_MODEL = 'deepseek'; // Cheap model for summaries
 
     // useEffect(() => {
     //     console.log("apiContext updated: ", apiContext);
@@ -135,6 +141,87 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         updateApiContext(updatedApiContext);
     };
 
+    /**
+     * Check if context compression is needed
+     */
+    const needsCompression = (context) => {
+        const userAssistantTurns = context.filter(m => m.role !== 'system');
+        return userAssistantTurns.length > COMPRESSION_THRESHOLD;
+    };
+
+    /**
+     * Compress context by summarizing old turns
+     * Returns compressed apiContext with summary injected
+     */
+    const compressContext = async (context) => {
+        console.log("🗜️ Context compression triggered");
+
+        // Separate system messages, old turns, recent turns
+        const systemMessages = context.filter(m => m.role === 'system');
+        const userAssistantTurns = context.filter(m => m.role !== 'system');
+
+        if (userAssistantTurns.length <= KEEP_RECENT_MESSAGES) {
+            return context; // Nothing to compress
+        }
+
+        const oldTurns = userAssistantTurns.slice(0, -KEEP_RECENT_MESSAGES);
+        const recentTurns = userAssistantTurns.slice(-KEEP_RECENT_MESSAGES);
+
+        console.log(`📦 Compressing ${oldTurns.length} old messages, keeping ${recentTurns.length} recent`);
+
+        // Check if we already have a summary - if so, include it in what we're summarizing
+        const existingSummary = systemMessages.find(m => m.content.startsWith(CONVERSATION_SUMMARY_LABEL));
+        const projectContext = systemMessages.find(m => m.content.startsWith(DYNAMIC_CONTEXT_LABEL));
+
+        // Build text to summarize
+        let textToSummarize = '';
+        if (existingSummary) {
+            textToSummarize += existingSummary.content + '\n\n';
+        }
+        textToSummarize += oldTurns.map(m => `${m.role}: ${m.content}`).join('\n\n');
+
+        // Call SecureChatAI to summarize
+        const summaryPrompt = `Concisely summarize this conversation in 3-5 sentences. Preserve key facts, decisions, and context. Be brief but comprehensive.\n\n${textToSummarize}`;
+
+        try {
+            const summaryResponse = await new Promise((resolve, reject) => {
+                window.chatbot_jsmo_module.callAI(
+                    [{ role: 'user', content: summaryPrompt }],
+                    (res) => {
+                        if (res && res.response) {
+                            resolve(res.response.content);
+                        } else {
+                            reject(new Error('Invalid summary response'));
+                        }
+                    },
+                    (err) => reject(err)
+                );
+            });
+
+            console.log("✅ Summary generated:", summaryResponse.substring(0, 100) + '...');
+
+            // Rebuild context with summary
+            const compressedContext = [
+                ...(projectContext ? [projectContext] : []),
+                {
+                    role: 'system',
+                    content: `${CONVERSATION_SUMMARY_LABEL}:\n${summaryResponse}`
+                },
+                ...recentTurns
+            ];
+
+            return compressedContext;
+
+        } catch (err) {
+            console.error("❌ Failed to generate summary:", err);
+            // Fallback: just keep recent messages without summary
+            return [
+                ...(projectContext ? [projectContext] : []),
+                ...recentTurns
+            ];
+        }
+    };
+
     const clearMessages = async () => {
         const newSessionId = Date.now().toString(); // Generate a new session ID
         setMsgCount(0);
@@ -178,10 +265,21 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         }
 
         const userMessageIndex = chatContextRef.current.length - 1;
-        const wrappedPayload = [...apiContextRef.current];
-        console.log("calling callAI with ", wrappedPayload);
 
-        window.chatbot_jsmo_module.callAI(wrappedPayload, (res) => {
+        // Check if compression is needed before sending
+        const handleCompressedCall = async () => {
+            let contextToSend = [...apiContextRef.current];
+
+            if (needsCompression(contextToSend)) {
+                console.log("🗜️ Compressing context before AI call...");
+                contextToSend = await compressContext(contextToSend);
+                // Update apiContext with compressed version
+                updateApiContext(contextToSend);
+            }
+
+            console.log("calling callAI with ", contextToSend);
+
+            window.chatbot_jsmo_module.callAI(contextToSend, (res) => {
             if (res && res.response) {
                 if (payload.meta?.internal) {
                     // Inject only assistant message for internal triggers
@@ -200,6 +298,10 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
             setErrorMessage("I'm having trouble connecting right now. Please wait a moment and try again.");
             if (callback) callback();
         });
+        };
+
+        // Execute the async compression + AI call
+        handleCompressedCall();
     };
 
     const updateVote = async (index, vote) => {
