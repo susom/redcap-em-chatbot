@@ -174,6 +174,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         $id = $response['id'] ?? null;
         $model = $response['model'] ?? null;
         $usage = $response['usage'] ?? null;
+        $tools_used = $response['tools_used'] ?? null; // Agent mode tool metadata
 
         // Return in required structure
         $formattedResponse = [
@@ -185,6 +186,12 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             'model' => $model,
             'usage' => $usage
         ];
+
+        // Include tool metadata if present (for UI indicators)
+        if (!empty($tools_used)) {
+            $formattedResponse['tools_used'] = $tools_used;
+        }
+
         return $formattedResponse;
     }
 

@@ -13,7 +13,16 @@ function Footer({ changeView }) {
     const handleSubmit = () => {
         if (input.trim() === "") return;
         setLoading(true);
-        chat_context.callAjax({ role: 'user', content: input }, () => setLoading(false));
+
+        // Failsafe: Clear loading spinner after 30 seconds no matter what
+        const timeoutId = setTimeout(() => {
+            setLoading(false);
+        }, 30000);
+
+        chat_context.callAjax({ role: 'user', content: input }, () => {
+            clearTimeout(timeoutId);
+            setLoading(false);
+        });
         setInput(""); // Clear input field
     };
 

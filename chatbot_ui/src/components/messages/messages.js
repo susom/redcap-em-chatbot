@@ -11,6 +11,20 @@ export const Messages = () => {
 
     const introText = window.cappy_project_config?.intro || "Hi I am Cappy! Your REDCap Support buddy. How can I assist you today?";
 
+    // Convert bullet points to proper markdown format
+    const formatMarkdown = (text) => {
+        if (!text) return text;
+
+        // Convert "• item" patterns to markdown list items with line breaks
+        // This handles both unicode bullet (•) and asterisk (*)
+        let formatted = text.replace(/([•\*])\s+/g, '\n- ');
+
+        // Clean up any leading line breaks
+        formatted = formatted.replace(/^\n+/, '');
+
+        return formatted;
+    };
+
     const handleClick = (vote, index) => {
         chat_context.updateVote(index, vote);
     };
@@ -59,7 +73,12 @@ export const Messages = () => {
                             )}
                             {message.assistant_content && (
                                 <dd className={`${!message.user_content?.trim() ? 'extratop_margin' : ''}`}>
-                                    <ReactMarkdown>{message.assistant_content}</ReactMarkdown>
+                                    <ReactMarkdown>{formatMarkdown(message.assistant_content)}</ReactMarkdown>
+                                    {message.tools_used && message.tools_used.length > 0 && (
+                                        <div style={{fontSize: '0.75rem', color: '#888', marginTop: '8px', fontStyle: 'italic'}}>
+                                            Used tools: {message.tools_used.map(t => t.name).join(', ')}
+                                        </div>
+                                    )}
                                     {!window.cappy_project_config?.hide_message_meta && (
                                         <div className={'msg_meta'}>
                                             <div className={'token_usage'}>

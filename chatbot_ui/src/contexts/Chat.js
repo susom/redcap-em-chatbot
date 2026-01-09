@@ -10,6 +10,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     const [sessionId, setSessionId] = useState(Date.now().toString());
     const [messages, setMessages] = useState([]);
     const [msgCount, setMsgCount] = useState(0);
+    const [errorMessage, setErrorMessage] = useState(null);
 
     const apiContextRef = useRef(apiContext);
     const chatContextRef = useRef(chatContext);
@@ -112,7 +113,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     };
 
     const updateMessage = async (response, index) => {
-        const { response: assistantResponse, usage, id, model } = response;
+        const { response: assistantResponse, usage, id, model, tools_used } = response;
         const updatedState = [...chatContextRef.current];
         updatedState[index] = {
             ...updatedState[index],
@@ -123,6 +124,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
             output_cost: usage ? usage.output_cost : null,
             id: id || null,
             model: model || null,
+            tools_used: tools_used || null,
         };
         await updateChatContext(updatedState);
 
@@ -190,9 +192,12 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                 if (callback) callback();
             } else {
                 console.log("Unexpected response format:", res);
+                setErrorMessage("I received an unexpected response. Please try again.");
+                if (callback) callback();
             }
         }, (err) => {
             console.log("callAI error", err);
+            setErrorMessage("I'm having trouble connecting right now. Please wait a moment and try again.");
             if (callback) callback();
         });
     };
@@ -224,8 +229,12 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         updateApiContext(updatedApiContext);
     };
 
+    const clearError = () => {
+        setErrorMessage(null);
+    };
+
     return (
-        <ChatContext.Provider value={{ messages, addMessage, clearMessages, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote, deleteInteraction }}>
+        <ChatContext.Provider value={{ messages, addMessage, clearMessages, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote, deleteInteraction, errorMessage, clearError }}>
             {children}
         </ChatContext.Provider>
     );
