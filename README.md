@@ -2,8 +2,30 @@
 
 Cappy is the **UI + orchestration layer** of the REDCap AI Ecosystem. It injects a React-based chatbot into REDCap pages (system-wide) or runs as a standalone embedded app, then assembles **project-scoped context** (system prompt + optional project metadata + RAG retrieval) and routes requests to **SecureChatAI** for model execution.
 
-**Requires**: SecureChatAI EM (model gateway) and optionally RedcapRAG EM (retrieval).  
+**Requires**: SecureChatAI EM (model gateway) and optionally RedcapRAG EM (retrieval).
 **Primary goal**: give REDCap users a consistent, safe, project-aware AI assistant experience.
+
+---
+
+## Recent Improvements (2026-01-08)
+
+**Context Compression**: Cappy now supports **infinite-length conversations** via automatic context compression:
+- Triggers after 20 messages (configurable)
+- Keeps system context + last 6 messages (3 recent Q&A pairs)
+- Summarizes old turns using SecureChatAI (cheap model: deepseek)
+- Injects summary as new system message
+- Enables unlimited conversation length without token/cost blowup
+
+**Production UX Hardening**:
+- **Error toasts**: User-facing error messages (5s auto-dismiss) for network/API failures
+- **Loading state failsafe**: 30-second timeout ensures spinner always clears
+- **Tool usage indicators**: Discreet gray text showing which agent tools were used
+- **Markdown formatting**: Bullet points (`•` and `*`) now render as proper lists
+
+**Architecture Documentation**:
+- **Dual context architecture**: `apiContext` (sent to AI) vs `chatContext` (UI display)
+- Compression only affects `apiContext`, full conversation history preserved in UI
+- Browser-only storage (IndexedDB via Dexie) - no server-side conversation persistence
 
 ---
 

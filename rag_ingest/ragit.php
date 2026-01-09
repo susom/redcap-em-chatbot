@@ -78,54 +78,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     continue;
                 }
 
-                $sections   = $json['content']['structured_sections'] ?? [];
-                $metadata   = $json['metadata'] ?? [];
-                $topics     = $metadata['topics'] ?? [];
-                $source_url = $json['source_url'] ?? '';
+                // Support new crapp.v1 structure
+                $documents = $json['documents'] ?? [];
 
-                // Sections → individual documents
-                foreach ($sections as $section) {
-                    $title   = $section['heading'] ?? 'Untitled Section';
-                    $content = $section['content'] ?? '';
-                    $points  = $section['points'] ?? [];
+                if (empty($documents)) {
+                    $ingestLog .= "  ❌ No 'documents' array found in JSON. Skipping.\n\n";
+                    continue;
+                }
 
-                    if (!empty($points)) {
-                        $content .= "\n\nPoints:\n- " . implode("\n- ", $points);
+                $sectionCount = 0;
+
+                // Process each document
+                foreach ($documents as $document) {
+                    $doc_id     = $document['doc_id'] ?? 'unknown';
+                    $source     = $document['source'] ?? [];
+                    $source_uri = $source['uri'] ?? '';
+                    $source_type = $source['type'] ?? 'unknown';
+                    $sections   = $document['sections'] ?? [];
+
+                    // Process each section as a RAG document
+                    foreach ($sections as $section) {
+                        $section_id = $section['section_id'] ?? 'unknown';
+                        $text       = $section['text'] ?? '';
+
+                        if (empty($text)) {
+                            continue; // Skip empty sections
+                        }
+
+                        // Use section_id as title (more descriptive than doc_id)
+                        $title = $section_id;
+
+                        // Build metadata
+                        $meta = [
+                            'doc_id'      => $doc_id,
+                            'section_id'  => $section_id,
+                            'source_type' => $source_type,
+                            'source_uri'  => $source_uri,
+                            'file'        => $name,
+                        ];
+
+                        // Add location info if present
+                        if (!empty($section['location'])) {
+                            $meta['location'] = $section['location'];
+                        }
+
+                        $doc = $text . "\n\n(Metadata: " . json_encode($meta) . ")";
+                        $rag->storeDocument($projectIdentifier, $title, $doc);
+                        $sectionCount++;
                     }
-
-                    $level = $section['level'] ?? null;
-                    $meta  = [
-                        'level'      => $level,
-                        'topics'     => $topics,
-                        'source_url' => $source_url,
-                        'file'       => $name,
-                        'links'      => $metadata['links'] ?? [],
-                    ];
-                    $doc = $content . "\n\n(Metadata: " . json_encode($meta) . ")";
-                    $rag->storeDocument($projectIdentifier, $title, $doc);
                 }
 
-                // Tables → separate documents
-                $tables = $json['content']['tables'] ?? [];
-                foreach ($tables as $table) {
-                    $caption = $table['title'] ?? 'Table';
-                    $headers = implode(" | ", $table['headers'] ?? []);
-                    $rowsTbl = implode("\n", array_map(
-                        fn($r) => implode(" | ", $r),
-                        $table['rows'] ?? []
-                    ));
-                    $table_content = "$caption\n$headers\n$rowsTbl";
-
-                    $meta = [
-                        'type'       => 'table',
-                        'source_url' => $source_url,
-                        'file'       => $name,
-                    ];
-                    $doc = $table_content . "\n\n(Metadata: " . json_encode($meta) . ")";
-                    $rag->storeDocument($projectIdentifier, $caption, $doc);
-                }
-
-                $ingestLog .= "  ✅ Finished ingesting {$name}\n\n";
+                $ingestLog .= "  ✅ Finished ingesting {$name} ({$sectionCount} sections)\n\n";
             }
         }
 
@@ -313,31 +316,34 @@ $rows = $rag->listContextDocuments($projectIdentifier);
                         </button>
                     </form>
 
-                    <h6>JSON File Template</h6>
+                    <h6>JSON File Template (Minimal Structure)</h6>
                     <pre class="border rounded p-2 bg-light small-pre">
 {
-  "source_url": "https://example.com/doc.html",
-  "metadata": {
-    "topics": ["consent", "privacy"]
-  },
-  "content": {
-    "structured_sections": [
-      {
-        "heading": "Introduction",
-        "level": 1,
-        "content": "This is the intro text."
-      }
-    ],
-    "tables": [
-      {
-        "title": "Consent Table",
-        "headers": ["Item", "Response"],
-        "rows": [["Q1", "Yes"], ["Q2", "No"]]
-      }
-    ]
-  }
+  "documents": [
+    {
+      "doc_id": "doc_manual_001",
+      "source": {
+        "type": "url",
+        "uri": "https://example.com/page.html"
+      },
+      "sections": [
+        {
+          "section_id": "sec_001",
+          "text": "Your section content goes here..."
+        },
+        {
+          "section_id": "sec_002",
+          "text": "Another section with more content..."
+        }
+      ]
+    }
+  ]
 }
                     </pre>
+                    <p class="small text-muted mb-0">
+                        <strong>Note:</strong> Each section becomes a separate RAG document.
+                        You can include multiple documents in the "documents" array.
+                    </p>
 
                     <?php if (!empty($ingestLog)): ?>
                         <div class="alert alert-secondary mt-3 mb-0">
