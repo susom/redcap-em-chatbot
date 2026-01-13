@@ -78,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     continue;
                 }
 
-                // Support new crapp.v1 structure
+                // Support new rpp.v1 structure
                 $documents = $json['documents'] ?? [];
 
                 if (empty($documents)) {
@@ -87,6 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 $sectionCount = 0;
+                $successCount = 0;
+                $failCount = 0;
 
                 // Process each document
                 foreach ($documents as $document) {
@@ -104,6 +106,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         if (empty($text)) {
                             continue; // Skip empty sections
                         }
+
+                        $sectionCount++;
 
                         // Use section_id as title (more descriptive than doc_id)
                         $title = $section_id;
@@ -123,12 +127,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
 
                         $doc = $text . "\n\n(Metadata: " . json_encode($meta) . ")";
-                        $rag->storeDocument($projectIdentifier, $title, $doc);
-                        $sectionCount++;
+
+                        // Attempt to store with retry logic for rate limiting
+                        $errorMsg = null;
+                        $success = false;
+                        $maxRetries = 4; // Increased from 3 since we have time
+
+                        for ($retry = 0; $retry < $maxRetries; $retry++) {
+                            $success = $rag->storeDocument($projectIdentifier, $title, $doc, null, $errorMsg);
+
+                            if ($success) {
+                                break;
+                            }
+
+                            // If rate limited, wait longer before retry
+                            if ($retry < $maxRetries - 1 && $errorMsg && stripos($errorMsg, 'network') !== false) {
+                                $waitTime = (int)pow(2, $retry + 1) * 5; // Exponential backoff: 10s, 20s, 40s
+                                $ingestLog .= "    ⏳ Rate limit hit on {$section_id}, waiting {$waitTime}s before retry " . ($retry + 2) . "/{$maxRetries}\n";
+                                sleep($waitTime);
+                            }
+                        }
+
+                        if ($success) {
+                            $successCount++;
+                        } else {
+                            $failCount++;
+                            $textLen = strlen($text);
+                            $docLen = strlen($doc);
+                            $tokenEstimate = (int)($docLen / 4); // Rough estimate: 1 token ≈ 4 chars
+                            $ingestLog .= "    ⚠️  Failed to ingest section: {$section_id} (after {$maxRetries} attempts)\n";
+                            $ingestLog .= "       Length: {$textLen} chars (+ metadata = {$docLen} chars, ~{$tokenEstimate} tokens)\n";
+                            if ($errorMsg) {
+                                $ingestLog .= "       Error: {$errorMsg}\n";
+                            }
+                        }
+
+                        // Add delay between API calls to prevent rate limiting
+                        // 4000ms = 4 seconds (conservative for occasional bulk ingestion)
+                        usleep(4000000);
                     }
                 }
 
-                $ingestLog .= "  ✅ Finished ingesting {$name} ({$sectionCount} sections)\n\n";
+                if ($failCount > 0) {
+                    $ingestLog .= "  ⚠️  Partially completed {$name}: {$successCount}/{$sectionCount} sections succeeded, {$failCount} failed\n\n";
+                } else {
+                    $ingestLog .= "  ✅ Finished ingesting {$name} ({$successCount}/{$sectionCount} sections)\n\n";
+                }
             }
         }
 
