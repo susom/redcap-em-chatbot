@@ -7,7 +7,30 @@ Cappy is the **UI + orchestration layer** of the REDCap AI Ecosystem. It injects
 
 ---
 
-## Recent Improvements (2026-01-08)
+## Recent Improvements
+
+### 2026-01-16: System-Level Config Project
+
+**System-level chatbot access**: The chatbot can now be accessed via system-level API URLs (no PID required) with configurable project settings:
+
+- **New system setting**: `rexi-config-project` (project-id dropdown in Control Center)
+- **Use case**: Embed standalone chatbot in dashboards/external apps without project context
+- **Behavior**:
+  - **With PID in URL** (`?pid=123`): Uses project 123's chatbot settings (unchanged)
+  - **Without PID + config project set**: Uses the config project's settings (shared configuration)
+  - **Without PID + no config project**: Falls back to system-level settings only
+- **Technical changes**:
+  - `standalone_chat.php`: Safely handles null config project with graceful fallback
+  - `REDCapChatBot.php`: Updated `getSetting()` and AJAX handler to accept config PID
+  - All `getProjectSetting()` calls now check for valid PID before execution
+
+**Example URL**: `http://localhost/api/?type=module&prefix=redcap-em-chatbot&page=pages%2Fstandalone_chat`
+
+This enables embedding Cappy in system-level dashboards (like RExI) while maintaining project-level configuration control.
+
+---
+
+### 2026-01-08: Context Compression & Production Hardening
 
 **Context Compression**: Cappy now supports **infinite-length conversations** via automatic context compression:
 - Triggers after 20 messages (configurable)
@@ -121,11 +144,84 @@ This means **ingestion into specific project namespaces is available directly in
 
 ### 2) Standalone Embedded Chatbot
 
-- Page: `pages/standalone.php`
+- Page: `pages/standalone_chat.php`
 - Provides runtime configuration via `window.cappy_project_config`
 - Injects initial system context via `injectJSMO()`
 - Posts `cappy-loaded` to parent window for embed coordination
 - Designed to support iframe and external app embedding
+
+---
+
+## Configuration Patterns
+
+Cappy supports three distinct configuration patterns depending on how it's accessed:
+
+### Pattern 1: Project Context (URL with `?pid=123`)
+**Use case**: Chatbot accessed from within a REDCap project
+
+```
+http://localhost/api/?type=module&prefix=redcap-em-chatbot&page=pages/standalone_chat&pid=123
+```
+
+**Settings source**: Project 123's Cappy configuration
+- `project_chatbot_title`
+- `project_chatbot_system_context`
+- `project-llm-model`
+- `agent_mode`
+- etc.
+
+**Fallback**: System-level settings if project setting is empty
+
+---
+
+### Pattern 2: System Context + Config Project
+**Use case**: Embedded chatbot in system-level dashboards (RExI, admin panels, etc.)
+
+```
+http://localhost/api/?type=module&prefix=redcap-em-chatbot&page=pages/standalone_chat
+```
+
+**Prerequisite**: Set `rexi-config-project` in Control Center → External Modules → Cappy config
+
+**Settings source**: The config project's Cappy settings (e.g., project 456)
+- Allows shared configuration across multiple system-level embeds
+- Admins configure one "config project" instead of duplicating system settings
+- Useful when different contexts need different AI personalities/prompts
+
+**Fallback**: System-level settings if config project setting is empty
+
+---
+
+### Pattern 3: System Context Only (No Config Project)
+**Use case**: Simple system-wide chatbot with minimal configuration
+
+```
+http://localhost/api/?type=module&prefix=redcap-em-chatbot&page=pages/standalone_chat
+```
+
+**Prerequisite**: `rexi-config-project` NOT set (or empty)
+
+**Settings source**: System-level settings only
+- `chatbot_system_context`
+- `chatbot_title`
+- `llm-model`
+- `gpt-temperature`
+- etc.
+
+**Behavior**: All project-level settings are skipped, system defaults used
+
+---
+
+### Configuration Decision Tree
+
+```
+Is there a pid in the URL?
+├─ YES → Use that project's settings
+└─ NO
+   ├─ Is rexi-config-project set?
+   │  ├─ YES → Use config project's settings
+   │  └─ NO → Use system-level settings only
+```
 
 ---
 

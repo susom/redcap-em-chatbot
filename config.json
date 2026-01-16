@@ -248,6 +248,12 @@
             "type": "checkbox"
         },
         {
+            "key": "rexi-config-project",
+            "name": "<strong>RExI Config Project</strong><br><i>The REDCap project that houses the RExI/chatbot configuration (for system-level access)</i>",
+            "type": "project-id",
+            "required": false
+        },
+        {
             "key": "llm-model",
             "name": "LLM Model",
             "required": false,

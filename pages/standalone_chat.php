@@ -1,27 +1,47 @@
 <?php
 /** @var \Stanford\REDCapChatBot\REDCapChatBot $module */
 
-// Always use project context if present, fallback to system
-$initial_system_context = $module->getProjectSetting('project_chatbot_system_context');
+// Determine which project to use for settings:
+// 1. Use current project if pid is in URL
+// 2. Otherwise use the RExI config project (system setting)
+// 3. If neither, skip project settings and fallback to system settings only
+$current_pid = isset($_GET['pid']) ? $_GET['pid'] : null;
+$config_pid = $current_pid ?: $module->getSystemSetting('rexi-config-project');
+
+// Only fetch project settings if we have a valid config project, otherwise use system defaults
+if (!empty($config_pid)) {
+    $initial_system_context = $module->getProjectSetting('project_chatbot_system_context', $config_pid);
+    $title = $module->getProjectSetting('project_chatbot_title', $config_pid);
+    $intro_text = $module->getProjectSetting('project_chatbot_intro', $config_pid);
+    $allowed_types = $module->getProjectSetting('project_allowed_context_types', $config_pid) ?: '';
+    $expanded_width = $module->getProjectSetting('project_expanded_width', $config_pid);
+    $expanded_height = $module->getProjectSetting('project_expanded_height', $config_pid);
+    $hide_message_meta = $module->getProjectSetting('hide_message_meta', $config_pid) ?: 0;
+    $custom_css = $module->getProjectSetting('project_chatbot_custom_css', $config_pid) ?? "";
+} else {
+    // No config project - use empty defaults (will fall back to system settings below)
+    $initial_system_context = null;
+    $title = null;
+    $intro_text = null;
+    $allowed_types = '';
+    $expanded_width = null;
+    $expanded_height = null;
+    $hide_message_meta = 0;
+    $custom_css = "";
+}
+
+// Fallback to system settings if project settings are empty
 if (empty($initial_system_context)) {
     $initial_system_context = $module->getSystemSetting('chatbot_system_context');
+}
+if (empty($title)) {
+    $title = $module->getSystemSetting('chatbot_title');
 }
 
 $globalUsername = $_SESSION['username'];
 if (!empty($globalUsername)) {
     $initial_system_context = "The current user's name is: {$globalUsername}. Please personalize your replies by addressing them directly when appropriate.\n\n" . $initial_system_context;
 }
-$title = $module->getProjectSetting('project_chatbot_title') ?: $module->getSystemSetting('chatbot_title') ?: null;
-$intro_text = $module->getProjectSetting('project_chatbot_intro') ?: null;
-
-// Allowed postMessage context types (comma-separated)
-$allowed_types = $module->getProjectSetting('project_allowed_context_types') ?: '';
-
-$expanded_width  = $module->getProjectSetting('project_expanded_width') ?: null;
-$expanded_height = $module->getProjectSetting('project_expanded_height') ?: null;
-$hide_message_meta   = $module->getProjectSetting('hide_message_meta') ?: 0;
-
-$custom_css     = $module->getProjectSetting('project_chatbot_custom_css') ?? "";
 $build_files    = $module->generateAssetFiles();
 ?>
 <!DOCTYPE html>

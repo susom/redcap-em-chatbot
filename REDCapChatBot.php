@@ -336,11 +336,17 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     /**
      * Get a project-level or system-level setting, with optional fallback.
+     * @param string $key The setting key
+     * @param mixed $default Default value if setting not found
+     * @param int|null $project_id Project ID to use for project settings (optional)
      */
-    public function getSetting($key, $default = null) {
-        $project_val = $this->getProjectSetting($key);
-        if ($project_val !== '' && (!empty($project_val) || $project_val === 0)) return $project_val;
-    
+    public function getSetting($key, $default = null, $project_id = null) {
+        // Only try to get project setting if we have a valid project ID
+        if (!empty($project_id)) {
+            $project_val = $this->getProjectSetting($key, $project_id);
+            if ($project_val !== '' && (!empty($project_val) || $project_val === 0)) return $project_val;
+        }
+
         if (strpos($key, 'project-') === 0) {
             $system_key = substr($key, strlen('project-'));
             $sys_val = $this->getSystemSetting($system_key);
@@ -364,18 +370,28 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
         switch ($action) {
             case "callAI":
+                // If no project context, use the RExI config project for settings
+                $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
+
                 $messages = $this->sanitizeInput($payload);
-                $model = $this->getSetting("project-llm-model");
+                $model = $this->getSetting("project-llm-model", null, $config_pid);
 
 
                 // RAG project identifier
-                $rag_project_identifier = $this->getSetting("project_rag_project_identifier", self::DEFAULT_PROJECT_IDENTIFIER);
+                $rag_project_identifier = $this->getSetting("project_rag_project_identifier", self::DEFAULT_PROJECT_IDENTIFIER, $config_pid);
 
                 //DON'T WASTE LOGGING ON SYSTEM DATA INJECT IT HERE NOT ON THE INJECT JS
-                $initial_system_context = ($this->getProjectSetting('project_chatbot_system_context')) ? $this->getProjectSetting('project_chatbot_system_context') : $this->getSystemSetting('chatbot_system_context');
+                $initial_system_context = null;
+                if (!empty($config_pid)) {
+                    $initial_system_context = $this->getProjectSetting('project_chatbot_system_context', $config_pid);
+                }
+                if (empty($initial_system_context)) {
+                    $initial_system_context = $this->getSystemSetting('chatbot_system_context');
+                }
 
                 //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
-                if ($this->getProjectSetting('inject-project-metadata')) {
+                $inject_metadata = !empty($config_pid) ? $this->getProjectSetting('inject-project-metadata', $config_pid) : false;
+                if ($inject_metadata) {
                     $current_project_context = $this->getREDCapProjectContext();
                     if (!empty($current_project_context)) {
                         $current_project_context = "Project Metadata:\n" . $current_project_context;
@@ -399,18 +415,18 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
                 // Only add params if they're set (not null/empty string)
                 $override_params = ["messages" => $messages];
-                $this->setIfNotBlank($override_params, "temperature", $this->getSetting("project-gpt-temperature"), 'float');
-                $this->setIfNotBlank($override_params, "top_p", $this->getSetting("project-gpt-top-p"), 'float');
-                $this->setIfNotBlank($override_params, "frequency_penalty", $this->getSetting("project-gpt-frequency-penalty"), 'float');
-                $this->setIfNotBlank($override_params, "presence_penalty", $this->getSetting("project-gpt-presence-penalty"), 'float');
-                $this->setIfNotBlank($override_params, "max_tokens", $this->getSetting("project-gpt-max-tokens"), 'int');
-                $this->setIfNotBlank($override_params, "reasoning", $this->getSetting("project-reasoning-effort"));
-                
-                $agent_mode = (bool) $this->getSetting("agent_mode");
+                $this->setIfNotBlank($override_params, "temperature", $this->getSetting("project-gpt-temperature", null, $config_pid), 'float');
+                $this->setIfNotBlank($override_params, "top_p", $this->getSetting("project-gpt-top-p", null, $config_pid), 'float');
+                $this->setIfNotBlank($override_params, "frequency_penalty", $this->getSetting("project-gpt-frequency-penalty", null, $config_pid), 'float');
+                $this->setIfNotBlank($override_params, "presence_penalty", $this->getSetting("project-gpt-presence-penalty", null, $config_pid), 'float');
+                $this->setIfNotBlank($override_params, "max_tokens", $this->getSetting("project-gpt-max-tokens", null, $config_pid), 'int');
+                $this->setIfNotBlank($override_params, "reasoning", $this->getSetting("project-reasoning-effort", null, $config_pid));
+
+                $agent_mode = (bool) $this->getSetting("agent_mode", null, $config_pid);
                 if ($agent_mode) {
                     $override_params["agent_mode"] = true;
                 }
-                $response = $this->getSecureChatInstance()->callAI($model, $override_params, $project_id);
+                $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid);
                 $result = $this->formatResponse($response);
 
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
