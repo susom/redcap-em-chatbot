@@ -73,7 +73,17 @@ export const Messages = () => {
                             )}
                             {message.assistant_content && (
                                 <dd className={`${!message.user_content?.trim() ? 'extratop_margin' : ''}`}>
-                                    <ReactMarkdown>{formatMarkdown(message.assistant_content)}</ReactMarkdown>
+                                    <ReactMarkdown
+                                        components={{
+                                            a: ({node, children, ...props}) => (
+                                                <a {...props} target="_blank" rel="noopener noreferrer">
+                                                    {children}
+                                                </a>
+                                            )
+                                        }}
+                                    >
+                                        {formatMarkdown(message.assistant_content)}
+                                    </ReactMarkdown>
                                     {message.tools_used && message.tools_used.length > 0 && (
                                         <div style={{fontSize: '0.75rem', color: '#888', marginTop: '8px', fontStyle: 'italic'}}>
                                             Used tools: {message.tools_used.map(t => t.name).join(', ')}
