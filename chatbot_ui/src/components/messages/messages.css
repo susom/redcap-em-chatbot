@@ -37,7 +37,7 @@
 .messages dt {
     float: right;
     width: 85%;
-    border-radius: 10px 10px 3px 10px;
+    border-radius: 10px 10px 10px 10px;
     background: #2846E4;
     color: #fff;
     padding: 10px 15px;
@@ -104,9 +104,9 @@
 
 .delete-icon {
     cursor: pointer;
-    color: red;
+    color: white;
     position:absolute;
-    top:0;
-    right:0;
+    top:2px;
+    right:2px;
 }
 
