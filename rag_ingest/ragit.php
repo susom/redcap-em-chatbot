@@ -9,7 +9,7 @@ if (!SUPER_USER && !USERID) {
 $rag               = $module->getRedcapRAGInstance();
 
 $current_pid = isset($_GET['pid']) ? $_GET['pid'] : null;
-$projectIdentifier = $module->getSetting("project_rag_project_identifier", $current_pid);
+$projectIdentifier = $module->getProjectSetting("project_rag_project_identifier", $current_pid);
 if (!$projectIdentifier) {
     echo "<h2>No RAG project identifier configured. $config_pid</h2>";
     exit;
