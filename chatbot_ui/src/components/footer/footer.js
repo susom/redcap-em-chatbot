@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useContext } from "react";
 import { ChatContext } from "../../contexts/Chat";
 import { Container } from 'react-bootstrap';
 import { Send, ArrowClockwise, EraserFill } from 'react-bootstrap-icons';
@@ -8,21 +8,11 @@ function Footer({ changeView }) {
     const chat_context = useContext(ChatContext);
     const [inputPH, setInputPH] = useState("Ask a question...");
     const [input, setInput] = useState("");
-    const [loading, setLoading] = useState(false);
 
     const handleSubmit = () => {
         if (input.trim() === "") return;
-        setLoading(true);
 
-        // Failsafe: Clear loading spinner after 30 seconds no matter what
-        const timeoutId = setTimeout(() => {
-            setLoading(false);
-        }, 30000);
-
-        chat_context.callAjax({ role: 'user', content: input }, () => {
-            clearTimeout(timeoutId);
-            setLoading(false);
-        });
+        chat_context.callAjax({ role: 'user', content: input });
         setInput(""); // Clear input field
     };
 
@@ -32,12 +22,6 @@ function Footer({ changeView }) {
             handleSubmit();
         }
     };
-
-    useEffect(() => {
-        if (!loading) {
-            setLoading(false);
-        }
-    }, [chat_context.chatContext]);
 
     return (
         <Container className="footer">
@@ -54,8 +38,8 @@ function Footer({ changeView }) {
                 />
             </div>
             <button onClick={handleSubmit}>
-                <Send color="#ccc" size={20} className={`send ${loading ? "off" : ""}`} />
-                <ArrowClockwise color="#ccc" size={20} className={`sendfill ${loading ? "rotate" : ""}`} />
+                <Send color="#ccc" size={20} className={`send ${chat_context.loading ? "off" : ""}`} />
+                <ArrowClockwise color="#ccc" size={20} className={`sendfill ${chat_context.loading ? "rotate" : ""}`} />
             </button>
         </Container>
 

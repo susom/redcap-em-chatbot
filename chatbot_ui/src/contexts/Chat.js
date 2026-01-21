@@ -11,6 +11,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     const [messages, setMessages] = useState([]);
     const [msgCount, setMsgCount] = useState(0);
     const [errorMessage, setErrorMessage] = useState(null);
+    const [loading, setLoading] = useState(false);
 
     const apiContextRef = useRef(apiContext);
     const chatContextRef = useRef(chatContext);
@@ -36,13 +37,13 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                     content: event.data.text,
                     meta: event.data.meta || { internal: true }
                 };
-    
+
                 // Inject internal user message
                 addMessage({ role: 'user', content: payload.content, meta: payload.meta });
                 callAjax(payload, null, true);
             }
         };
-    
+
         window.addEventListener('message', handleInitiate);
         return () => window.removeEventListener('message', handleInitiate);
     }, []);
@@ -74,7 +75,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
     const addMessage = (message) => {
         let updatedApiContext;
-    
+
         // If system context
         if (message.role === "system" && message.content.startsWith(DYNAMIC_CONTEXT_LABEL)) {
             // Remove any previous system context, keep user/assistant turns
@@ -86,7 +87,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
             updateApiContext(updatedApiContext);
             return;
         }
-    
+
         // Otherwise, add the message after the system context (if present)
         const systemContext = apiContextRef.current.find(
             entry => entry.role === "system" && entry.content.startsWith(DYNAMIC_CONTEXT_LABEL)
@@ -94,7 +95,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         const userAssistantTurns = apiContextRef.current.filter(
             entry => !(entry.role === "system" && entry.content.startsWith(DYNAMIC_CONTEXT_LABEL))
         );
-    
+
         // Append new turn
         updatedApiContext = [
             ...(systemContext ? [systemContext] : []),
@@ -102,7 +103,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
             { role: message.role, content: message.content, index: userAssistantTurns.length, meta: message.meta ?? undefined  }
         ];
         updateApiContext(updatedApiContext);
-    
+
         // Only update chatContext for user/assistant, not system messages
         if (message.role === "user" || message.role === "assistant") {
             const newChatContext = [
@@ -111,7 +112,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                     user_content: message.role === 'user' ? message.content : null,
                     assistant_content: message.role === 'assistant' ? message.content : null,
                     timestamp: new Date().getTime(),
-                    meta: message.meta ?? undefined 
+                    meta: message.meta ?? undefined
                 },
             ];
             updateChatContext(newChatContext);
@@ -245,6 +246,8 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     };
 
     const callAjax = (payload, callback, skipAddMessage = false) => {
+        setLoading(true); // Set loading to true when starting the call
+
         if (!injectedUsername.current && window.cappy_project_config?.current_user) {
             console.log("Injecting username message...", window.cappy_project_config?.current_user);
             addMessage({
@@ -259,7 +262,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         if (projectContextRef && projectContextRef.current) {
             addMessage({ role: "system", content: DYNAMIC_CONTEXT_LABEL + ":\n" + projectContextRef.current });
         }
-        
+
         if (!skipAddMessage) {
             addMessage({ role: 'user', content: payload.content, meta: payload.meta });
         }
@@ -280,24 +283,26 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
             console.log("calling callAI with ", contextToSend);
 
             window.chatbot_jsmo_module.callAI(contextToSend, (res) => {
-            if (res && res.response) {
-                if (payload.meta?.internal) {
-                    // Inject only assistant message for internal triggers
-                    addMessage({ role: 'assistant', content: res.response.content });
+                setLoading(false); // Clear loading on success
+                if (res && res.response) {
+                    if (payload.meta?.internal) {
+                        // Inject only assistant message for internal triggers
+                        addMessage({ role: 'assistant', content: res.response.content });
+                    } else {
+                        updateMessage(res, userMessageIndex);
+                    }
+                    if (callback) callback();
                 } else {
-                    updateMessage(res, userMessageIndex);
+                    console.log("Unexpected response format:", res);
+                    setErrorMessage("I received an unexpected response. Please try again.");
+                    if (callback) callback();
                 }
+            }, (err) => {
+                setLoading(false); // Clear loading on error
+                console.log("callAI error", err);
+                setErrorMessage("I'm having trouble connecting right now. Please wait a moment and try again.");
                 if (callback) callback();
-            } else {
-                console.log("Unexpected response format:", res);
-                setErrorMessage("I received an unexpected response. Please try again.");
-                if (callback) callback();
-            }
-        }, (err) => {
-            console.log("callAI error", err);
-            setErrorMessage("I'm having trouble connecting right now. Please wait a moment and try again.");
-            if (callback) callback();
-        });
+            });
         };
 
         // Execute the async compression + AI call
@@ -336,7 +341,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     };
 
     return (
-        <ChatContext.Provider value={{ messages, addMessage, clearMessages, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote, deleteInteraction, errorMessage, clearError }}>
+        <ChatContext.Provider value={{ messages, addMessage, clearMessages, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote, deleteInteraction, errorMessage, clearError, loading }}>
             {children}
         </ChatContext.Provider>
     );
