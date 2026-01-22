@@ -127,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $meta['location'] = $section['location'];
                         }
 
-                        $doc = $text . "\n\n(Metadata: " . json_encode($meta) . ")";
+                        $doc = $text;
 
                         // Attempt to store with retry logic for rate limiting
                         $errorMsg = null;
@@ -135,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $maxRetries = 4; // Increased from 3 since we have time
 
                         for ($retry = 0; $retry < $maxRetries; $retry++) {
-                            $success = $rag->storeDocument($projectIdentifier, $title, $doc, null, $errorMsg);
+                            $success = $rag->storeDocument($projectIdentifier, $title, $doc, null, $errorMsg, $meta);
 
                             if ($success) {
                                 break;
