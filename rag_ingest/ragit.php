@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // Use section_id as title (more descriptive than doc_id)
                         $title = $section_id;
 
-                        // Build metadata
+                        // Build metadata (flatten nested objects for Pinecone)
                         $meta = [
                             'doc_id'      => $doc_id,
                             'section_id'  => $section_id,
@@ -122,9 +122,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'file'        => $name,
                         ];
 
-                        // Add location info if present
+                        // Add section version/update if present
+                        if (!empty($section['section_version'])) {
+                            $meta['section_version'] = $section['section_version'];
+                        }
+                        if (!empty($section['section_updated'])) {
+                            $meta['section_updated'] = $section['section_updated'];
+                        }
+
+                        // Flatten location (Pinecone doesn't accept nested objects)
                         if (!empty($section['location'])) {
-                            $meta['location'] = $section['location'];
+                            $loc = $section['location'];
+                            if (isset($loc['page'])) $meta['location_page'] = $loc['page'];
+                            if (isset($loc['section_title'])) $meta['location_section_title'] = $loc['section_title'];
+                            if (isset($loc['window_index'])) $meta['location_window_index'] = $loc['window_index'];
+                        }
+
+                        // Flatten AI metadata (optional - for debugging/auditing)
+                        if (!empty($section['ai'])) {
+                            $ai = $section['ai'];
+                            if (isset($ai['normalized'])) $meta['ai_normalized'] = $ai['normalized'];
+                            if (isset($ai['trigger_reason'])) $meta['ai_trigger_reason'] = $ai['trigger_reason'];
                         }
 
                         $doc = $text;
