@@ -1,7 +1,7 @@
 import React, { useContext, useRef, useEffect } from "react";
 import { Overlay, Popover } from 'react-bootstrap';
 import ReactMarkdown from "react-markdown";
-import { HandThumbsUp, HandThumbsDown, HandThumbsUpFill, HandThumbsDownFill, XCircleFill, ArrowClockwise, CircleFill } from 'react-bootstrap-icons';
+import { HandThumbsUp, HandThumbsDown, HandThumbsUpFill, HandThumbsDownFill, XCircleFill, CircleFill } from 'react-bootstrap-icons';
 import { ChatContext } from "../../contexts/Chat";
 import "./messages.css";
 
@@ -17,7 +17,7 @@ export const Messages = () => {
 
         // Convert "• item" patterns to markdown list items with line breaks
         // This handles both unicode bullet (•) and asterisk (*)
-        let formatted = text.replace(/([•\*])\s+/g, '\n- ');
+        let formatted = text.replace(/([•*])\s+/g, '\n- ');
 
         // Clean up any leading line breaks
         formatted = formatted.replace(/^\n+/, '');
@@ -120,13 +120,15 @@ export const Messages = () => {
                 <p className={`empty`}><em className={`soft_text`}>{introText}</em></p>
             )}
             {chat_context.loading && (
-                <>
-                    <div className="extratop_margin loading-ellipsis">
-                        <CircleFill className="pulse" size={8} />
-                        <CircleFill className="pulse" size={8} />
-                        <CircleFill className="pulse" size={8} />
-                    </div>
-                </>
+                <dl className="loading-dl">
+                    <dd className="extratop_margin">
+                        <div className="loading-ellipsis">
+                            <CircleFill className="pulse" size={5} />
+                            <CircleFill className="pulse" size={5} />
+                            <CircleFill className="pulse" size={5} />
+                        </div>
+                    </dd>
+                </dl>
             )}
         </div>
     );

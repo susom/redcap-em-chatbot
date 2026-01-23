@@ -1,5 +1,5 @@
 import React, { createContext, useState, useRef, useEffect } from 'react';
-import { saveNewSession, updateSession, getSession, deleteSession } from '../components/database/dexie';
+import { saveNewSession, updateSession, getSession } from '../components/database/dexie';
 
 export const ChatContext = createContext();
 
@@ -23,7 +23,6 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     // Context compression settings
     const COMPRESSION_THRESHOLD = 20; // Trigger compression after 20 messages
     const KEEP_RECENT_MESSAGES = 6;   // Keep last 6 messages (3 Q&A pairs)
-    const SUMMARIZATION_MODEL = 'deepseek'; // Cheap model for summaries
 
     // useEffect(() => {
     //     console.log("apiContext updated: ", apiContext);
@@ -46,6 +45,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
         window.addEventListener('message', handleInitiate);
         return () => window.removeEventListener('message', handleInitiate);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const updateApiContext = (newContext) => {

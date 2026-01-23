@@ -6,7 +6,6 @@ import "./footer.css";
 
 function Footer({ changeView }) {
     const chat_context = useContext(ChatContext);
-    const [inputPH, setInputPH] = useState("Ask a question...");
     const [input, setInput] = useState("");
 
     const handleSubmit = () => {
@@ -31,10 +30,11 @@ function Footer({ changeView }) {
                 </button>
                 <input
                 className="user_input"
-                placeholder={inputPH}
+                placeholder="Ask a question..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
+                disabled={chat_context.loading}
                 />
             </div>
             <button onClick={handleSubmit}>
