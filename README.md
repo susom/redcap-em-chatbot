@@ -313,4 +313,6 @@ Cappy is the **chat surface and orchestration layer** for REDCap AI:
 - Retrieval via RedcapRAG
 - Execution via SecureChatAI
 
+
 Together, these form a modular, compliant, and extensible REDCap AI Ecosystem.
+testing
