@@ -7,10 +7,11 @@ if (!SUPER_USER && !USERID) {
 }
 
 $rag               = $module->getRedcapRAGInstance();
-$projectIdentifier = $module->getSetting("project_rag_project_identifier");
 
+$current_pid = isset($_GET['pid']) ? $_GET['pid'] : null;
+$projectIdentifier = $module->getProjectSetting("project_rag_project_identifier", $current_pid);
 if (!$projectIdentifier) {
-    echo "<h2>No RAG project identifier configured.</h2>";
+    echo "<h2>No RAG project identifier configured. $config_pid</h2>";
     exit;
 }
 
@@ -112,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // Use section_id as title (more descriptive than doc_id)
                         $title = $section_id;
 
-                        // Build metadata
+                        // Build metadata (flatten nested objects for Pinecone)
                         $meta = [
                             'doc_id'      => $doc_id,
                             'section_id'  => $section_id,
@@ -121,12 +122,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             'file'        => $name,
                         ];
 
-                        // Add location info if present
-                        if (!empty($section['location'])) {
-                            $meta['location'] = $section['location'];
+                        // Add section version/update if present
+                        if (!empty($section['section_version'])) {
+                            $meta['section_version'] = $section['section_version'];
+                        }
+                        if (!empty($section['section_updated'])) {
+                            $meta['section_updated'] = $section['section_updated'];
                         }
 
-                        $doc = $text . "\n\n(Metadata: " . json_encode($meta) . ")";
+                        // Flatten location (Pinecone doesn't accept nested objects)
+                        if (!empty($section['location'])) {
+                            $loc = $section['location'];
+                            if (isset($loc['page'])) $meta['location_page'] = $loc['page'];
+                            if (isset($loc['section_title'])) $meta['location_section_title'] = $loc['section_title'];
+                            if (isset($loc['window_index'])) $meta['location_window_index'] = $loc['window_index'];
+                        }
+
+                        // Flatten AI metadata (optional - for debugging/auditing)
+                        if (!empty($section['ai'])) {
+                            $ai = $section['ai'];
+                            if (isset($ai['normalized'])) $meta['ai_normalized'] = $ai['normalized'];
+                            if (isset($ai['trigger_reason'])) $meta['ai_trigger_reason'] = $ai['trigger_reason'];
+                        }
+
+                        $doc = $text;
 
                         // Attempt to store with retry logic for rate limiting
                         $errorMsg = null;
@@ -134,7 +153,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $maxRetries = 4; // Increased from 3 since we have time
 
                         for ($retry = 0; $retry < $maxRetries; $retry++) {
-                            $success = $rag->storeDocument($projectIdentifier, $title, $doc, null, $errorMsg);
+                            $success = $rag->storeDocument($projectIdentifier, $title, $doc, null, $errorMsg, $meta);
 
                             if ($success) {
                                 break;
