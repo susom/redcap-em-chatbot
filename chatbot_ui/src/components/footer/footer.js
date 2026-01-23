@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import { ChatContext } from "../../contexts/Chat";
 import { Container } from 'react-bootstrap';
 import { Send, ArrowClockwise, EraserFill } from 'react-bootstrap-icons';
@@ -7,6 +7,7 @@ import "./footer.css";
 function Footer({ changeView }) {
     const chat_context = useContext(ChatContext);
     const [input, setInput] = useState("");
+    const inputRef = useRef(null);
 
     const handleSubmit = () => {
         if (input.trim() === "") return;
@@ -22,6 +23,12 @@ function Footer({ changeView }) {
         }
     };
 
+    useEffect(() => {
+     if (!chat_context.loading) {
+       inputRef.current && inputRef.current.focus();
+     }
+   }, [chat_context.loading]);
+
     return (
         <Container className="footer">
             <div className="left-group">
@@ -29,12 +36,13 @@ function Footer({ changeView }) {
                 <EraserFill color="#ccc" size={20} />
                 </button>
                 <input
-                className="user_input"
-                placeholder="Ask a question..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={chat_context.loading}
+                    className="user_input"
+                    placeholder="Ask a question..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    disabled={chat_context.loading}
+                    ref={inputRef}
                 />
             </div>
             <button onClick={handleSubmit}>
