@@ -27,12 +27,6 @@
                 "icon": "fa-solid fa-robot",
                 "url": "pages/standalone_chat.php",
                 "show-header-and-footer": false
-            },
-            {
-                "name": "Project Chatbot RAG Tools",
-                "icon": "fa-solid fa-gear",
-                "url": "rag_ingest/ragit.php",
-                "show-header-and-footer": false
             }
         ],
         "control-center": [
@@ -84,12 +78,6 @@
             "name": "<b>Enable Agent Mode</b><br><i>(experimental)</i> Allows the chatbot to use multi-step agentic workflows with tool execution.",
             "required": false,
             "type": "checkbox"
-        },
-        {
-            "key": "project_rag_project_identifier",
-            "name": "RAG Scope identifier",
-            "required": false,
-            "type": "text"
         },
         {
             "key": "project_chatbot_intro",

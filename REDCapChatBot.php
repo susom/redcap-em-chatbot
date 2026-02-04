@@ -377,9 +377,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $model = $this->getSetting("project-llm-model", null, $config_pid);
 
 
-                // RAG project identifier
-                $rag_project_identifier = $this->getSetting("project_rag_project_identifier", self::DEFAULT_PROJECT_IDENTIFIER, $config_pid);
-
                 //DON'T WASTE LOGGING ON SYSTEM DATA INJECT IT HERE NOT ON THE INJECT JS
                 $initial_system_context = null;
                 if (!empty($config_pid)) {
@@ -400,7 +397,19 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 }
 
                 //FIND AND INJECT RAG TOO
-                $ragContext = $this->getRedcapRAGInstance()?->getRelevantDocuments($rag_project_identifier, $messages) ?? [];
+                // Get sibling RAG EM instance in same project context
+                $ragInstance = $this->getRedcapRAGInstance($config_pid);
+                if ($ragInstance) {
+                    // Get namespace from RAG EM's project settings
+                    $rag_namespace = $ragInstance->getProjectSetting('rag_target_namespace', $config_pid);
+                    if (!empty($rag_namespace)) {
+                        $ragContext = $ragInstance->getRelevantDocuments($rag_namespace, $messages) ?? [];
+                    } else {
+                        $ragContext = [];
+                    }
+                } else {
+                    $ragContext = [];
+                }
                 foreach ($ragContext as $doc) {
                     $this->emDebug("GOT RAG?!", $doc);
                     $messages = $this->appendSystemContext($messages, self::RAG_CONTEXT_PREFIX . $doc['content']);
@@ -466,11 +475,11 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      *
      * @return \Stanford\RedcapRAG\RedcapRAG|null
      */
-    public function getRedcapRAGInstance(): ?\Stanford\RedcapRAG\RedcapRAG
+    public function getRedcapRAGInstance($project_id = null): ?\Stanford\RedcapRAG\RedcapRAG
     {
         if (empty($this->redcapRAGInstance)) {
             try {
-                $instance = \ExternalModules\ExternalModules::getModuleInstance(self::RedcapRAGInstanceModuleName);
+                $instance = \ExternalModules\ExternalModules::getModuleInstance(self::RedcapRAGInstanceModuleName, $project_id);
                 if ($instance) {
                     $this->setRedcapRAGInstance($instance);
                 } else {
