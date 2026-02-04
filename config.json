@@ -142,6 +142,10 @@
                     "name": "GPT-4.1"
                 },
                 {
+                    "value": "gpt-5",
+                    "name": "GPT-5"
+                },
+                {
                     "value": "o1",
                     "name": "GPT-o1"
                 },
@@ -154,8 +158,20 @@
                     "name": "Claude 3.7 Sonnet"
                 },
                 {
+                    "value": "deepseek",
+                    "name": "DeepSeek"
+                },
+                {
                     "value": "gemini20flash",
                     "name": "Gemini 2.0 Flash"
+                },
+                {
+                    "value": "gemini25pro",
+                    "name": "Gemini 2.5 Pro"
+                },
+                {
+                    "value": "llama3370b",
+                    "name": "Llama 3.3 70B"
                 },
                 {
                     "value": "llama-Maverick",
@@ -256,6 +272,10 @@
                     "name": "GPT-4.1"
                 },
                 {
+                    "value": "gpt-5",
+                    "name": "GPT-5"
+                },
+                {
                     "value": "o1",
                     "name": "GPT-o1"
                 },
@@ -268,8 +288,20 @@
                     "name": "Claude 3.7 Sonnet"
                 },
                 {
+                    "value": "deepseek",
+                    "name": "DeepSeek"
+                },
+                {
                     "value": "gemini20flash",
                     "name": "Gemini 2.0 Flash"
+                },
+                {
+                    "value": "gemini25pro",
+                    "name": "Gemini 2.5 Pro"
+                },
+                {
+                    "value": "llama3370b",
+                    "name": "Llama 3.3 70B"
                 },
                 {
                     "value": "llama-Maverick",
