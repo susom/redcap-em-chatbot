@@ -397,9 +397,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 }
 
                 //FIND AND INJECT RAG TOO
-                // Get sibling RAG EM instance in same project context
-                $ragInstance = $this->getRedcapRAGInstance($config_pid);
-                if ($ragInstance) {
+                // Get RAG EM instance and read namespace from its project settings
+                $ragInstance = $this->getRedcapRAGInstance();
+                if ($ragInstance && !empty($config_pid)) {
                     // Get namespace from RAG EM's project settings
                     $rag_namespace = $ragInstance->getProjectSetting('rag_target_namespace', $config_pid);
                     if (!empty($rag_namespace)) {
@@ -475,11 +475,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      *
      * @return \Stanford\RedcapRAG\RedcapRAG|null
      */
-    public function getRedcapRAGInstance($project_id = null): ?\Stanford\RedcapRAG\RedcapRAG
+    public function getRedcapRAGInstance(): ?\Stanford\RedcapRAG\RedcapRAG
     {
         if (empty($this->redcapRAGInstance)) {
             try {
-                $instance = \ExternalModules\ExternalModules::getModuleInstance(self::RedcapRAGInstanceModuleName, $project_id);
+                // Get global RAG instance (no project_id to avoid version mismatch issues)
+                // We'll read project-specific settings from the instance later
+                $instance = \ExternalModules\ExternalModules::getModuleInstance(self::RedcapRAGInstanceModuleName);
                 if ($instance) {
                     $this->setRedcapRAGInstance($instance);
                 } else {
