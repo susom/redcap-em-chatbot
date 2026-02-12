@@ -11,10 +11,15 @@ const ALLOWED_CONTEXT_TYPES = window.cappy_project_config?.allowed_context_types
 
 // Listen for postMessage at the global/window level
 window.addEventListener('message', (event) => {
-  console.log("message received?" , ALLOWED_CONTEXT_TYPES, event.data.type);
-
   if (!event.data || !event.data.type) return;
-  if (ALLOWED_CONTEXT_TYPES.includes(event.data.type)) {
+  
+  // Only process context injection messages (not commands like export-session-delta)
+  const contextTypes = ['rexi-dashboard-context', 'rexi-project-context', 'rexi-memory-context'];
+  if (contextTypes.includes(event.data.type)) {
+    if (!event.data.projectContext || typeof event.data.projectContext !== 'object') {
+      console.warn("Received context message with type", event.data.type, "but projectContext is missing or invalid");
+      return;
+    }
     const summary = Object.entries(event.data.projectContext)
     .map(([k, v]) => {
       if (typeof v === "object") {

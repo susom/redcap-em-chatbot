@@ -24,6 +24,9 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     const COMPRESSION_THRESHOLD = 20; // Trigger compression after 20 messages
     const KEEP_RECENT_MESSAGES = 6;   // Keep last 6 messages (3 Q&A pairs)
 
+    // Delta export tracking for parent window consumers
+    const lastExportedRef = useRef(0);
+
     // useEffect(() => {
     //     console.log("apiContext updated: ", apiContext);
     // }, [apiContext]);
@@ -40,6 +43,27 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                 // Inject internal user message
                 addMessage({ role: 'user', content: payload.content, meta: payload.meta });
                 callAjax(payload, null, true);
+            }
+
+            // Generic delta export: parent window requests new messages since last export
+            if (event.data?.type === 'export-session-delta') {
+                const delta = apiContextRef.current
+                    .slice(lastExportedRef.current)
+                    .filter(m => m.role === 'user' || m.role === 'assistant');
+                
+                console.log('[CAPPY-DELTA-EXPORT] Exporting session delta:', {
+                    messages: delta,
+                    messageCount: delta.length,
+                    totalContextLength: apiContextRef.current.length,
+                    lastExportedIndex: lastExportedRef.current
+                });
+                
+                lastExportedRef.current = apiContextRef.current.length;
+                window.parent.postMessage({
+                    type: 'session-delta',
+                    delta,
+                    sessionId
+                }, '*');
             }
         };
 
