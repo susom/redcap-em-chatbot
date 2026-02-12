@@ -151,8 +151,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         if (is_array($payload)) {
             foreach ($payload as $message) {
                 $sanitized[] = [
-                    'role' => filter_var($message['role'], FILTER_SANITIZE_STRING),
-                    'content' => filter_var($message['content'], FILTER_SANITIZE_STRING),
+                    'role' => $message['role'] ?? '',
+                    'content' => $message['content'] ?? '',
                 ];
             }
         }
@@ -420,7 +420,17 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $messages = $this->appendSystemContext($messages, $initial_system_context);
                 }
 
-                // $this->emDebug("initial general system context and project Metadata and RAG", $messages);
+                $this->emDebug("Full message context with RAG", [
+                    'message_count' => count($messages),
+                    'has_rag' => !empty($ragContext),
+                    'messages_preview' => array_map(function($msg) {
+                        return [
+                            'role' => $msg['role'],
+                            'content_length' => strlen($msg['content'] ?? ''),
+                            'content_preview' => substr($msg['content'] ?? '', 0, 200)
+                        ];
+                    }, $messages)
+                ]);
 
                 // Only add params if they're set (not null/empty string)
                 $override_params = ["messages" => $messages];
@@ -439,7 +449,29 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $result = $this->formatResponse($response);
 
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
-                return json_encode($result);
+
+                // Debug response size and RAG context to identify WAF triggers
+                $json_result = json_encode($result);
+                if ($json_result === false) {
+                    $this->emError("JSON encoding failed", [
+                        'error' => json_last_error_msg(),
+                        'result_keys' => array_keys($result)
+                    ]);
+                    return json_encode(['error' => 'Failed to encode response']);
+                }
+
+                $this->emDebug("Response payload analysis", [
+                    'response_bytes' => strlen($json_result),
+                    'response_kb' => round(strlen($json_result) / 1024, 2),
+                    'has_rag' => !empty($ragContext),
+                    'rag_doc_count' => count($ragContext ?? []),
+                    'message_count' => count($override_params['messages'] ?? []),
+                    'model' => $model,
+                    'contains_script_tag' => (stripos($json_result, '<script') !== false),
+                    'contains_select_keyword' => (stripos($json_result, 'SELECT') !== false)
+                ]);
+
+                return $json_result;
 
             default:
                 throw new Exception("Action $action is not defined");
