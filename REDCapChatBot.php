@@ -373,7 +373,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 // If no project context, use the RExI config project for settings
                 $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
 
-                $messages = $this->sanitizeInput($payload);
+                // Extract messages and session_id from payload (new structure: {messages: [], session_id: string})
+                $messages = isset($payload['messages']) ? $this->sanitizeInput($payload['messages']) : $this->sanitizeInput($payload);
                 $model = $this->getSetting("project-llm-model", null, $config_pid);
 
 
@@ -445,6 +446,12 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 if ($agent_mode) {
                     $override_params["agent_mode"] = true;
                 }
+                
+                // Pass through session_id for audit logging if provided
+                if (!empty($payload['session_id'])) {
+                    $override_params['session_id'] = $payload['session_id'];
+                }
+                
                 $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid);
                 $result = $this->formatResponse($response);
 

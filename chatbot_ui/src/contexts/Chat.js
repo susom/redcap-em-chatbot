@@ -211,7 +211,10 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         try {
             const summaryResponse = await new Promise((resolve, reject) => {
                 window.chatbot_jsmo_module.callAI(
-                    [{ role: 'user', content: summaryPrompt }],
+                    {
+                        messages: [{ role: 'user', content: summaryPrompt }],
+                        session_id: sessionId
+                    },
                     (res) => {
                         if (res && res.response) {
                             resolve(res.response.content);
@@ -306,7 +309,10 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
             console.log("calling callAI with ", contextToSend);
 
-            window.chatbot_jsmo_module.callAI(contextToSend, (res) => {
+            window.chatbot_jsmo_module.callAI({
+                messages: contextToSend,
+                session_id: sessionId
+            }, (res) => {
                 setLoading(false); // Clear loading on success
                 if (res && res.response) {
                     if (payload.meta?.internal) {
