@@ -166,6 +166,7 @@ http://localhost/api/?type=module&prefix=redcap-em-chatbot&page=pages/standalone
 **Settings source**: Project 123's Cappy configuration
 - `project_chatbot_title`
 - `project_chatbot_system_context`
+- `project_escalation_prompt_guidance` (optional)
 - `project-llm-model`
 - `agent_mode`
 - etc.

@@ -116,6 +116,12 @@
             "type": "textarea"
         },
         {
+            "key": "project_escalation_prompt_guidance",
+            "name": "Escalation prompt guidance (optional)",
+            "required": false,
+            "type": "textarea"
+        },
+        {
             "key": "project_chatbot_custom_css",
             "name": "Custom CSS for Standalone Chatbot",
             "required": false,

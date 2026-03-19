@@ -58,6 +58,10 @@ export const Messages = () => {
     }, [chat_context.chatContext]);
 
     const visibleMessages = chat_context.chatContext.filter(m => m?.meta?.internal !== true);
+    const getToolNames = (toolsUsed) => {
+        if (!Array.isArray(toolsUsed)) return [];
+        return toolsUsed.map(t => t?.name).filter(Boolean);
+    };
 
     return (
         <div className={`messages`}>
@@ -71,8 +75,22 @@ export const Messages = () => {
                                     <XCircleFill className="delete-icon" onClick={() => handleDelete(index)} />
                                 </dt>
                             )}
-                            {message.assistant_content && (
-                                <dd className={`${!message.user_content?.trim() ? 'extratop_margin' : ''}`}>
+                            {message.assistant_content && (() => {
+                                const toolNames = getToolNames(message.tools_used);
+                                const hasEscalationTool = toolNames.some(name => name.startsWith('escalation.'));
+                                return (
+                                <dd
+                                    className={`${!message.user_content?.trim() ? 'extratop_margin' : ''} ${hasEscalationTool ? 'has-escalation-tool' : ''}`}
+                                    data-tools={toolNames.join(',')}
+                                    data-has-escalation={hasEscalationTool ? 'true' : 'false'}
+                                >
+                                    {toolNames.length > 0 && (
+                                        <span className="tool-markers" aria-hidden="true">
+                                            {toolNames.map((name) => (
+                                                <span key={name} className="tool-marker" data-tool={name} />
+                                            ))}
+                                        </span>
+                                    )}
                                     <ReactMarkdown
                                         components={{
                                             a: ({node, children, ...props}) => (
@@ -84,9 +102,9 @@ export const Messages = () => {
                                     >
                                         {formatMarkdown(message.assistant_content)}
                                     </ReactMarkdown>
-                                    {message.tools_used && message.tools_used.length > 0 && (
-                                        <div style={{fontSize: '0.75rem', color: '#888', marginTop: '8px', fontStyle: 'italic'}}>
-                                            Used tools: {message.tools_used.map(t => t.name).join(', ')}
+                                    {toolNames.length > 0 && (
+                                        <div className="tool-usage">
+                                            Used tools: {toolNames.join(', ')}
                                         </div>
                                     )}
                                     {!window.cappy_project_config?.hide_message_meta && (
@@ -111,7 +129,8 @@ export const Messages = () => {
                                         </div>
                                     )}
                                 </dd>
-                            )}
+                                );
+                            })()}
                         </dl>
                         {index < visibleMessages.length - 1 && <hr className="divider" />}
                     </React.Fragment>

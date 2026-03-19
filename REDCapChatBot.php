@@ -380,11 +380,16 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
                 //DON'T WASTE LOGGING ON SYSTEM DATA INJECT IT HERE NOT ON THE INJECT JS
                 $initial_system_context = null;
+                $escalation_guidance = null;
                 if (!empty($config_pid)) {
                     $initial_system_context = $this->getProjectSetting('project_chatbot_system_context', $config_pid);
+                    $escalation_guidance = $this->getProjectSetting('project_escalation_prompt_guidance', $config_pid);
                 }
                 if (empty($initial_system_context)) {
                     $initial_system_context = $this->getSystemSetting('chatbot_system_context');
+                }
+                if (!empty($escalation_guidance)) {
+                    $initial_system_context = trim(($initial_system_context ?? '') . "\n\n" . $escalation_guidance);
                 }
 
                 //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT

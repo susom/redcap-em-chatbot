@@ -103,6 +103,13 @@
     margin-top: 5px;
 }
 
+.tool-usage {
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 8px;
+    font-style: italic;
+}
+
 .divider {
     border: 0;
     height: 1px;

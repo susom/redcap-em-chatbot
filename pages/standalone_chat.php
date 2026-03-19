@@ -11,6 +11,7 @@ $config_pid = $current_pid ?: $module->getSystemSetting('rexi-config-project');
 // Only fetch project settings if we have a valid config project, otherwise use system defaults
 if (!empty($config_pid)) {
     $initial_system_context = $module->getProjectSetting('project_chatbot_system_context', $config_pid);
+    $escalation_guidance = $module->getProjectSetting('project_escalation_prompt_guidance', $config_pid);
     $title = $module->getProjectSetting('project_chatbot_title', $config_pid);
     $intro_text = $module->getProjectSetting('project_chatbot_intro', $config_pid);
     $allowed_types = $module->getProjectSetting('project_allowed_context_types', $config_pid) ?: '';
@@ -21,6 +22,7 @@ if (!empty($config_pid)) {
 } else {
     // No config project - use empty defaults (will fall back to system settings below)
     $initial_system_context = null;
+    $escalation_guidance = null;
     $title = null;
     $intro_text = null;
     $allowed_types = '';
@@ -41,6 +43,10 @@ if (empty($title)) {
 $globalUsername = $_SESSION['username'];
 if (!empty($globalUsername)) {
     $initial_system_context = "The current user's name is: {$globalUsername}. Please personalize your replies by addressing them directly when appropriate.\n\n" . $initial_system_context;
+}
+
+if (!empty($escalation_guidance)) {
+    $initial_system_context = trim(($initial_system_context ?? '') . "\n\n" . $escalation_guidance);
 }
 $build_files    = $module->generateAssetFiles();
 ?>
