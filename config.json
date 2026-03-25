@@ -86,8 +86,8 @@
             "type": "textarea"
         },
         {
-            "key": "project_allowed_context_types",
-            "name": "Allowed postMessage event types for Dynamic context injection (comma separated)",
+            "key": "project_allowed_context_namespaces",
+            "name": "Allowed context namespaces for postMessage injection (comma separated, e.g. rexi-dashboard, rexi-project, rexi-memory)",
             "required": false,
             "type": "textarea"
         },

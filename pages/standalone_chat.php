@@ -14,7 +14,7 @@ if (!empty($config_pid)) {
     $escalation_guidance = $module->getProjectSetting('project_escalation_prompt_guidance', $config_pid);
     $title = $module->getProjectSetting('project_chatbot_title', $config_pid);
     $intro_text = $module->getProjectSetting('project_chatbot_intro', $config_pid);
-    $allowed_types = $module->getProjectSetting('project_allowed_context_types', $config_pid) ?: '';
+    $allowed_namespaces = $module->getProjectSetting('project_allowed_context_namespaces', $config_pid) ?: '';
     $expanded_width = $module->getProjectSetting('project_expanded_width', $config_pid);
     $expanded_height = $module->getProjectSetting('project_expanded_height', $config_pid);
     $hide_message_meta = $module->getProjectSetting('hide_message_meta', $config_pid) ?: 0;
@@ -25,7 +25,7 @@ if (!empty($config_pid)) {
     $escalation_guidance = null;
     $title = null;
     $intro_text = null;
-    $allowed_types = '';
+    $allowed_namespaces = '';
     $expanded_width = null;
     $expanded_height = null;
     $hide_message_meta = 0;
@@ -65,8 +65,8 @@ $build_files    = $module->generateAssetFiles();
         current_user: <?=json_encode($globalUsername) ?>,
         expanded_width: <?= json_encode($expanded_width) ?>,
         expanded_height: <?= json_encode($expanded_height) ?>,
-        allowed_context_types: <?= json_encode(
-            array_map('trim', explode(',', $allowed_types))
+        allowed_context_namespaces: <?= json_encode(
+            array_filter(array_map('trim', explode(',', $allowed_namespaces)))
         ) ?>,
         hide_message_meta: <?= json_encode($hide_message_meta)?>
     };

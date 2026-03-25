@@ -7,30 +7,51 @@ import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
 
 const projectContextRef = { current: null }; // Mutable ref-like object
-const ALLOWED_CONTEXT_TYPES = window.cappy_project_config?.allowed_context_types;
+const contextStore = {};
+const ALLOWED_NAMESPACES = window.cappy_project_config?.allowed_context_namespaces || [];
+
+const summarizeContext = (context) => (
+  Object.entries(context)
+    .map(([k, v]) => {
+      if (typeof v === "object") {
+        return `${k}: ${JSON.stringify(v, null, 2)}`;
+      }
+      return `${k}: ${v}`;
+    })
+    .join('\n')
+);
+
+const buildCombinedContext = (store) => {
+  return Object.values(store)
+    .map(({ label, summary }) => `${label}:\n${summary}`)
+    .join('\n\n');
+};
 
 // Listen for postMessage at the global/window level
 window.addEventListener('message', (event) => {
   if (!event.data || !event.data.type) return;
-  
-  // Only process context injection messages (not commands like export-session-delta)
-  const contextTypes = ['rexi-dashboard-context', 'rexi-project-context', 'rexi-memory-context'];
-  if (contextTypes.includes(event.data.type)) {
-    if (!event.data.projectContext || typeof event.data.projectContext !== 'object') {
-      console.warn("Received context message with type", event.data.type, "but projectContext is missing or invalid");
+
+  if (event.data.type === 'context-inject') {
+    const { namespace, label, context } = event.data;
+    if (!namespace || !context || typeof context !== 'object') {
+      console.warn('[CAPPY] context-inject missing namespace or context', event.data);
       return;
     }
-    const summary = Object.entries(event.data.projectContext)
-    .map(([k, v]) => {
-      if (typeof v === "object") {
-        return `${k}: ${JSON.stringify(v, null, 2)}`;
-      } else {
-        return `${k}: ${v}`;
-      }
-    })
-    .join('\n');
+    if (ALLOWED_NAMESPACES.length > 0 && !ALLOWED_NAMESPACES.includes(namespace)) {
+      console.warn('[CAPPY] namespace not allowed:', namespace);
+      return;
+    }
+    contextStore[namespace] = { label: label || namespace, summary: summarizeContext(context) };
+    projectContextRef.current = buildCombinedContext(contextStore);
+  }
 
-    projectContextRef.current = summary;
+  if (event.data.type === 'context-clear') {
+    if (event.data.namespace) {
+      delete contextStore[event.data.namespace];
+    } else {
+      Object.keys(contextStore).forEach(k => delete contextStore[k]);
+    }
+    projectContextRef.current = buildCombinedContext(contextStore);
   }
 });
 
