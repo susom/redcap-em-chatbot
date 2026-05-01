@@ -140,51 +140,51 @@
             "type": "dropdown",
             "choices": [
                 {
-                    "value": "gpt-4o",
-                    "name": "GPT-4o"
-                },
-                {
-                    "value": "gpt-4.1",
+                    "value": "gpt-4-1",
                     "name": "GPT-4.1"
                 },
                 {
-                    "value": "gpt-5",
-                    "name": "GPT-5"
+                    "value": "gpt-4-1-nano",
+                    "name": "GPT-4.1 Nano"
                 },
                 {
-                    "value": "o1",
-                    "name": "GPT-o1"
+                    "value": "gpt-5-4",
+                    "name": "GPT-5.4"
                 },
                 {
-                    "value": "o3-mini",
-                    "name": "GPT-o3-mini"
+                    "value": "gpt-5-4-nano",
+                    "name": "GPT-5.4 Nano"
                 },
                 {
-                    "value": "claude",
-                    "name": "Claude 3.7 Sonnet"
+                    "value": "o3",
+                    "name": "o3"
                 },
                 {
-                    "value": "deepseek",
-                    "name": "DeepSeek"
+                    "value": "o4-mini",
+                    "name": "o4-mini"
                 },
                 {
-                    "value": "gemini20flash",
-                    "name": "Gemini 2.0 Flash"
+                    "value": "claude-sonnet-4.6",
+                    "name": "Claude Sonnet 4.6"
                 },
                 {
-                    "value": "gemini25pro",
+                    "value": "claude-opus-4-7",
+                    "name": "Claude Opus 4.7"
+                },
+                {
+                    "value": "deepseek-r1",
+                    "name": "DeepSeek R1"
+                },
+                {
+                    "value": "gemini-2.5-flash",
+                    "name": "Gemini 2.5 Flash"
+                },
+                {
+                    "value": "gemini-2.5-pro",
                     "name": "Gemini 2.5 Pro"
-                },
-                {
-                    "value": "llama3370b",
-                    "name": "Llama 3.3 70B"
-                },
-                {
-                    "value": "llama-Maverick",
-                    "name": "Llama 4 Maverick"
                 }
             ],
-            "default": "gpt-4o"
+            "default": "gpt-4-1"
         },
         {
             "key": "project-gpt-temperature",
@@ -223,7 +223,7 @@
         },
         {
             "key": "project-reasoning-effort",
-            "name": "<b>Reasoning Effort</b>  <br>(only applicable to o1, o3-mini reasoning models)",
+            "name": "<b>Reasoning Effort</b>  <br>(only applicable to o3, o4-mini reasoning models)",
             "required": false,
             "type": "dropdown",
             "choices": [
@@ -270,51 +270,51 @@
             "type": "dropdown",
             "choices": [
                 {
-                    "value": "gpt-4o",
-                    "name": "GPT-4o"
-                },
-                {
-                    "value": "gpt-4.1",
+                    "value": "gpt-4-1",
                     "name": "GPT-4.1"
                 },
                 {
-                    "value": "gpt-5",
-                    "name": "GPT-5"
+                    "value": "gpt-4-1-nano",
+                    "name": "GPT-4.1 Nano"
                 },
                 {
-                    "value": "o1",
-                    "name": "GPT-o1"
+                    "value": "gpt-5-4",
+                    "name": "GPT-5.4"
                 },
                 {
-                    "value": "o3-mini",
-                    "name": "GPT-o3-mini"
+                    "value": "gpt-5-4-nano",
+                    "name": "GPT-5.4 Nano"
                 },
                 {
-                    "value": "claude",
-                    "name": "Claude 3.7 Sonnet"
+                    "value": "o3",
+                    "name": "o3"
                 },
                 {
-                    "value": "deepseek",
-                    "name": "DeepSeek"
+                    "value": "o4-mini",
+                    "name": "o4-mini"
                 },
                 {
-                    "value": "gemini20flash",
-                    "name": "Gemini 2.0 Flash"
+                    "value": "claude-sonnet-4.6",
+                    "name": "Claude Sonnet 4.6"
                 },
                 {
-                    "value": "gemini25pro",
+                    "value": "claude-opus-4-7",
+                    "name": "Claude Opus 4.7"
+                },
+                {
+                    "value": "deepseek-r1",
+                    "name": "DeepSeek R1"
+                },
+                {
+                    "value": "gemini-2.5-flash",
+                    "name": "Gemini 2.5 Flash"
+                },
+                {
+                    "value": "gemini-2.5-pro",
                     "name": "Gemini 2.5 Pro"
-                },
-                {
-                    "value": "llama3370b",
-                    "name": "Llama 3.3 70B"
-                },
-                {
-                    "value": "llama-Maverick",
-                    "name": "Llama 4 Maverick"
                 }
             ],
-            "default": "gpt-4o"
+            "default": "gpt-4-1"
         },
         {
             "key": "gpt-temperature",
@@ -356,6 +356,18 @@
             "name": "Raw text to inject into system context for Cappy",
             "required": false,
             "type": "textarea"
+        },
+        {
+            "key": "chatbot_escalation_prompt_guidance",
+            "name": "Escalation prompt guidance (system-level fallback)",
+            "required": false,
+            "type": "textarea"
+        },
+        {
+            "key": "rag_target_namespace",
+            "name": "<strong>RAG Target Namespace</strong><br><i>System-level RAG namespace to use when no project-level namespace is configured</i>",
+            "required": false,
+            "type": "text"
         },
         {
             "key": "chatbot_exclude_list",
