@@ -461,7 +461,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $override_params['session_id'] = $payload['session_id'];
                 }
                 
-                $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid);
+                $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid, $user_id);
                 $result = $this->formatResponse($response);
 
                 $this->emDebug("calling SecureChatAI.callAI()", $result);
