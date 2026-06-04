@@ -388,6 +388,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 if (empty($initial_system_context)) {
                     $initial_system_context = $this->getSystemSetting('chatbot_system_context');
                 }
+                if (empty($escalation_guidance)) {
+                    $escalation_guidance = $this->getSystemSetting('chatbot_escalation_prompt_guidance');
+                }
                 if (!empty($escalation_guidance)) {
                     $initial_system_context = trim(($initial_system_context ?? '') . "\n\n" . $escalation_guidance);
                 }
@@ -403,16 +406,17 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 }
 
                 //FIND AND INJECT RAG TOO
-                // Get RAG EM instance and read namespace from its project settings
+                // Get RAG EM instance and read namespace from its project settings, fallback to system setting
                 $ragInstance = $this->getRedcapRAGInstance();
+                $rag_namespace = null;
                 if ($ragInstance && !empty($config_pid)) {
-                    // Get namespace from RAG EM's project settings
                     $rag_namespace = $ragInstance->getProjectSetting('rag_target_namespace', $config_pid);
-                    if (!empty($rag_namespace)) {
-                        $ragContext = $ragInstance->getRelevantDocuments($rag_namespace, $messages) ?? [];
-                    } else {
-                        $ragContext = [];
-                    }
+                }
+                if (empty($rag_namespace)) {
+                    $rag_namespace = $this->getSystemSetting('rag_target_namespace');
+                }
+                if ($ragInstance && !empty($rag_namespace)) {
+                    $ragContext = $ragInstance->getRelevantDocuments($rag_namespace, $messages) ?? [];
                 } else {
                     $ragContext = [];
                 }
