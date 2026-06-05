@@ -31,64 +31,14 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     public function redcap_every_page_top($project_id) {
         $sysEnabled = (string)$this->getSystemSetting('enable-system-ui-injection') === '1';
-        // If disabled and we're not inside a project with its own settings, stop immediately
+
+        // System injection off and not inside a project — nothing to do
         if (!$sysEnabled && empty($project_id)) {
             return;
         }
 
-        //THIS IS THE PROPER EXCLUDE LIST FOR CAPPY, comment out for now to make it function as INCLUDE so that i can limited test on prod
-        //        try {
-        //            // List of pages to exclude UI injection
-        //            $exclusion_list = $this->getSystemSetting("chatbot_exclude_list");
-        //            $excludedPages = array_map('trim', explode(",", $exclusion_list));
-        //
-        //            $currentPage = $_SERVER['SCRIPT_NAME'] ?? '';
-        //
-        //            // Inject UI unless the current page is in the exclusion list
-        //            foreach ($excludedPages as $excludedPage) {
-        //                if (strpos($currentPage, $excludedPage) !== false) {
-        //                    return; // Stop execution if the page is excluded
-        //                }
-        //            }
-        //
-        //            // Inject the UI
-        //            $this->injectIntegrationUI();
-        //
-        //        } catch (\Exception $e) {
-        //            \REDCap::logEvent('Exception injecting chatbot UI.', $e->getMessage());
-        //        }
-
-        // TEMPORARY MAKE IT INCLUDE LIST SO I CAN LIMIT WHERE I TEST IT ON REDCAP PROD
         try {
-            // List of pages to include UI injection (temporarily using the exclusion list setting)
-            $exclusion_list = $this->getSystemSetting("chatbot_exclude_list"); // TODO: This is acting as an include list for now
-            $excludedPages = array_map('trim', explode(",", $exclusion_list));
-
-            $currentPage = $_SERVER['SCRIPT_NAME'] ?? '';
-            $queryString = $_SERVER['QUERY_STRING'] ?? '';
-
-            $this->emDebug($queryString, preg_match('/pid=(\d+)/', $queryString, $matches), $matches[1]);
-            // Inject UI only if the current page is in the "include" list (reusing exclusion logic)
-            $inject = false; // Temporary repurpose
-            foreach ($excludedPages as $excludedPage) {
-                if (strpos($currentPage, $excludedPage) !== false) {
-                    $inject = true; // Mark for injection if included
-                    break;
-                }
-                // Check if the query string contains a matching project ID
-                if (preg_match('/pid=(\d+)/', $queryString, $matches) && $matches[1] == $excludedPage) {
-                    $inject = true;
-                    break;
-                }
-            }
-
-            if (!$inject) {
-                return; // Stop execution if the page is not in the "include" list
-            }
-
-            // Inject the UI
             $this->injectIntegrationUI();
-
         } catch (\Exception $e) {
             \REDCap::logEvent('Exception injecting chatbot UI.', $e->getMessage());
         }
