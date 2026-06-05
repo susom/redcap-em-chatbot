@@ -291,20 +291,30 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      * @param int|null $project_id Project ID to use for project settings (optional)
      */
     public function getSetting($key, $default = null, $project_id = null) {
-        // Only try to get project setting if we have a valid project ID
+        // Try project setting first
         if (!empty($project_id)) {
             $project_val = $this->getProjectSetting($key, $project_id);
             if ($project_val !== '' && (!empty($project_val) || $project_val === 0)) return $project_val;
         }
 
+        // Strip project prefix (hyphen or underscore) to derive system-level key
         if (strpos($key, 'project-') === 0) {
             $system_key = substr($key, strlen('project-'));
-            $sys_val = $this->getSystemSetting($system_key);
-            if ($sys_val !== '' && (!empty($sys_val) || $sys_val === 0)) return $sys_val;
+        } elseif (strpos($key, 'project_') === 0) {
+            $system_key = substr($key, strlen('project_'));
         } else {
+            $system_key = $key;
+        }
+
+        $sys_val = $this->getSystemSetting($system_key);
+        if ($sys_val !== '' && (!empty($sys_val) || $sys_val === 0)) return $sys_val;
+
+        // Fallback: try exact key if derived key differed
+        if ($system_key !== $key) {
             $sys_val = $this->getSystemSetting($key);
             if ($sys_val !== '' && (!empty($sys_val) || $sys_val === 0)) return $sys_val;
         }
+
         return $default;
     }
     
@@ -329,18 +339,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
 
                 //DON'T WASTE LOGGING ON SYSTEM DATA INJECT IT HERE NOT ON THE INJECT JS
-                $initial_system_context = null;
-                $escalation_guidance = null;
-                if (!empty($config_pid)) {
-                    $initial_system_context = $this->getProjectSetting('project_chatbot_system_context', $config_pid);
-                    $escalation_guidance = $this->getProjectSetting('project_escalation_prompt_guidance', $config_pid);
-                }
-                if (empty($initial_system_context)) {
-                    $initial_system_context = $this->getSystemSetting('chatbot_system_context');
-                }
-                if (empty($escalation_guidance)) {
-                    $escalation_guidance = $this->getSystemSetting('chatbot_escalation_prompt_guidance');
-                }
+                $initial_system_context = $this->getSetting('project_chatbot_system_context', null, $config_pid);
+                $escalation_guidance    = $this->getSetting('project_escalation_prompt_guidance', null, $config_pid);
                 if (!empty($escalation_guidance)) {
                     $initial_system_context = trim(($initial_system_context ?? '') . "\n\n" . $escalation_guidance);
                 }

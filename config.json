@@ -358,22 +358,34 @@
             "type": "textarea"
         },
         {
-            "key": "chatbot_escalation_prompt_guidance",
+            "key": "escalation_prompt_guidance",
             "name": "Escalation prompt guidance (system-level fallback)",
             "required": false,
             "type": "textarea"
+        },
+        {
+            "key": "agent-mode",
+            "name": "<b>Enable Agent Mode (system-wide default)</b><br><i>(experimental)</i> Allows the chatbot to use multi-step agentic workflows with tool execution.",
+            "required": false,
+            "type": "checkbox"
+        },
+        {
+            "key": "reasoning-effort",
+            "name": "<b>Reasoning Effort (system-wide default)</b><br>(only applicable to o3, o4-mini reasoning models)",
+            "required": false,
+            "type": "dropdown",
+            "choices": [
+                { "value": "low",    "name": "low"    },
+                { "value": "medium", "name": "medium" },
+                { "value": "high",   "name": "high"   }
+            ],
+            "default": "medium"
         },
         {
             "key": "rag_target_namespace",
             "name": "<strong>RAG Target Namespace</strong><br><i>System-level RAG namespace to use when no project-level namespace is configured</i>",
             "required": false,
             "type": "text"
-        },
-        {
-            "key": "chatbot_exclude_list",
-            "name": "Comma delimited list of URL fragments to exclude Cappy",
-            "required": false,
-            "type": "textarea"
         },
         {
             "key": "rag_emtracking_pid",
