@@ -80,6 +80,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
         $globalUsername = $_SESSION['username'] ?? null;
 
+        $cappy_url = $this->getUrl('chatbot_ui/src/assets/images/cappy.png');
+        echo '<style>:root { --cappy-url: url(' . json_encode($cappy_url) . '); }</style>';
+
         echo '<script>window.cappy_project_config = ' . json_encode([
             'title'                      => $title,
             'intro'                      => $intro_text,

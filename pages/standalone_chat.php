@@ -71,8 +71,9 @@ $build_files    = $module->generateAssetFiles();
         hide_message_meta: <?= json_encode($hide_message_meta)?>
     };
     </script>
-    <?php 
-        foreach ($build_files as $file):  
+    <?php
+        echo '<style>:root { --cappy-url: url(' . json_encode($module->getUrl('chatbot_ui/src/assets/images/cappy.png')) . '); }</style>';
+        foreach ($build_files as $file):
             echo $file;
         endforeach;
         
