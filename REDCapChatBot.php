@@ -38,7 +38,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         }
 
         try {
-            $this->injectIntegrationUI();
+            $this->injectIntegrationUI($project_id);
         } catch (\Exception $e) {
             \REDCap::logEvent('Exception injecting chatbot UI.', $e->getMessage());
         }
@@ -62,7 +62,34 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         <?php
     }
 
-    public function injectIntegrationUI() {
+    public function injectIntegrationUI($project_id = null) {
+        $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
+
+        if (!empty($config_pid)) {
+            $title             = $this->getProjectSetting('project_chatbot_title', $config_pid);
+            $intro_text        = $this->getProjectSetting('project_chatbot_intro', $config_pid);
+            $allowed_ns        = $this->getProjectSetting('project_allowed_context_namespaces', $config_pid) ?: '';
+            $expanded_width    = $this->getProjectSetting('project_expanded_width', $config_pid);
+            $expanded_height   = $this->getProjectSetting('project_expanded_height', $config_pid);
+            $hide_message_meta = $this->getProjectSetting('hide_message_meta', $config_pid) ?: 0;
+        } else {
+            $title = $intro_text = $allowed_ns = $expanded_width = $expanded_height = null;
+            $hide_message_meta = 0;
+        }
+        if (empty($title)) $title = $this->getSystemSetting('chatbot_title');
+
+        $globalUsername = $_SESSION['username'] ?? null;
+
+        echo '<script>window.cappy_project_config = ' . json_encode([
+            'title'                      => $title,
+            'intro'                      => $intro_text,
+            'current_user'               => $globalUsername,
+            'expanded_width'             => $expanded_width,
+            'expanded_height'            => $expanded_height,
+            'allowed_context_namespaces' => array_values(array_filter(array_map('trim', explode(',', $allowed_ns ?: '')))),
+            'hide_message_meta'          => $hide_message_meta,
+        ]) . ';</script>';
+
         $this->injectJSMO(null);
         $build_files = $this->generateAssetFiles();
         foreach ($build_files as $file) {
