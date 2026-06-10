@@ -40,6 +40,27 @@
     cursor: move; /* Indicate draggable area */
 }
 
+#chatbot_ui_container.cappy-fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 99999;
+    pointer-events: auto;
+}
+
+#chatbot_ui_container.cappy-fullscreen .draggable-container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    bottom: auto;
+    right: auto;
+    width: 80vw;
+    height: 85vh;
+}
+
 .App {
     width: auto; /* Make .App fill the container */
     height: auto; /* Adjust height as necessary, or make it auto based on content */

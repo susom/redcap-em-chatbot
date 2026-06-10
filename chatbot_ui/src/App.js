@@ -22,8 +22,6 @@ function App() {
         height: defaultExpandedHeight
     });
 
-    const isProjectContext = typeof window.cappy_project_config !== "undefined";
-
     const changeView = (viewName) => {
         if (viewName === 'splash') {
             window.parent.postMessage({ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }, '*');
@@ -94,9 +92,7 @@ function App() {
         </div>
     );
     
-    return isProjectContext ? (
-        content
-    ) : (
+    return (
         <Draggable
             handle=".handle"
             position={defaultPosition}
