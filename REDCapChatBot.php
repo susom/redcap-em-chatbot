@@ -30,6 +30,11 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     public function redcap_every_page_top($project_id) {
+        // Hide EM API actions table from non-superusers on the project API page
+        if (defined('PAGE') && PAGE === 'API/project_api' && !(defined('SUPER_USER') && SUPER_USER)) {
+            echo '<style>#external-modules-api-actions { display: none !important; }</style>';
+        }
+
         $sysEnabled = (string)$this->getSystemSetting('enable-system-ui-injection') === '1';
 
         // System injection off and not inside a project — nothing to do
