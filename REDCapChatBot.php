@@ -380,6 +380,12 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $initial_system_context = trim(($initial_system_context ?? '') . "\n\n" . $escalation_guidance);
                 }
 
+                // Always tell the agent which project it is operating in so tool calls with required `pid` work
+                if (!empty($config_pid)) {
+                    $pid_context = "You are operating in REDCap project ID {$config_pid}. When using record or project tools, use {$config_pid} as the pid unless the user explicitly specifies a different project.";
+                    $initial_system_context = $pid_context . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
+                }
+
                 //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
                 $inject_metadata = !empty($config_pid) ? $this->getProjectSetting('inject-project-metadata', $config_pid) : false;
                 if ($inject_metadata) {
