@@ -9,6 +9,29 @@ Cappy is the **UI + orchestration layer** of the REDCap AI Ecosystem. It injects
 
 ## Recent Improvements
 
+### 2026-06-10: Pilot Hardening — Injected Widget, Agent Mode, Fullscreen
+
+**Injected widget now fully project-aware:**
+- `injectIntegrationUI($project_id)` now reads and emits `window.cappy_project_config` (title, intro, dimensions, namespaces, custom CSS) — previously the widget always showed system defaults
+- `--cappy-url` CSS variable injected server-side so project custom CSS can reference the Cappy logo without hardcoded paths or base64 blobs
+- Custom CSS from project settings now applied to the injected widget (was standalone-only before)
+
+**Agent mode governance (AND logic):**
+- `agent-mode` system setting (Control Center) = global valve — feature is available
+- `agent_mode` project setting = per-project opt-in — project wants the feature
+- **Both must be true** for agent mode to fire; previously either one was sufficient
+
+**Agent context — current project ID auto-injected:**
+- `callAI` now prepends `"You are operating in REDCap project ID {$pid}..."` to the system context so the agent always knows which project's tools to call (record tools require `pid` as a required parameter)
+
+**Injected widget UI fixes (rebuild included):**
+- Drag always enabled (was disabled when `cappy_project_config` was defined, which is now always)
+- Expand button (fullscreen): `full-screen` postMessage handled by both PHP listener (CSS overlay) and React state (ResizableBox dimensions ~88vw/88vh, centered)
+- Collapsing from fullscreen properly exits fullscreen state + removes overlay
+- Raised ResizableBox `maxConstraints` to `[1400, 1000]` to allow fullscreen sizes
+
+---
+
 ### 2026-01-16: System-Level Config Project
 
 **System-level chatbot access**: The chatbot can now be accessed via system-level API URLs (no PID required) with configurable project settings:
@@ -139,8 +162,7 @@ This means **ingestion into specific project namespaces is available directly in
 - Hook: `redcap_every_page_top($project_id)`
 - Controlled by system setting:
   - `enable-system-ui-injection`
-- Page filtering supported via `chatbot_exclude_list`
-  - (currently repurposed as an include list for limited production testing)
+- No page exclusion list — injection fires on all project pages when the EM is enabled on a project, or system-wide when `enable-system-ui-injection` is on
 
 ### 2) Standalone Embedded Chatbot
 
@@ -250,7 +272,7 @@ Context is always injected as **system messages**, not user messages.
 
 ### UI / Injection
 - `redcap_every_page_top($project_id)`
-- `injectIntegrationUI()`
+- `injectIntegrationUI($project_id = null)`
 - `generateAssetFiles(): array`
 - `injectJSMO($data = null, $init_method = null): void`
 
