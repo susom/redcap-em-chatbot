@@ -72,9 +72,11 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $expanded_width    = $this->getProjectSetting('project_expanded_width', $config_pid);
             $expanded_height   = $this->getProjectSetting('project_expanded_height', $config_pid);
             $hide_message_meta = $this->getProjectSetting('hide_message_meta', $config_pid) ?: 0;
+            $custom_css        = $this->getProjectSetting('project_chatbot_custom_css', $config_pid) ?? '';
         } else {
             $title = $intro_text = $allowed_ns = $expanded_width = $expanded_height = null;
             $hide_message_meta = 0;
+            $custom_css = '';
         }
         if (empty($title)) $title = $this->getSystemSetting('chatbot_title');
 
@@ -82,6 +84,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
         $cappy_url = $this->getUrl('chatbot_ui/src/assets/images/cappy.png');
         echo '<style>:root { --cappy-url: url(' . json_encode($cappy_url) . '); }</style>';
+        if (!empty($custom_css)) {
+            echo '<style>' . $custom_css . '</style>';
+        }
 
         echo '<script>window.cappy_project_config = ' . json_encode([
             'title'                      => $title,
