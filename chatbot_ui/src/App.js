@@ -12,6 +12,7 @@ import './assets/styles/global.css';
 function App() {
     const [currentView, setCurrentView] = useState('splash');
     const [defaultPosition, setDefaultPosition] = useState({ x: 0, y: 0 });
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Use config-defined defaults
     const defaultExpandedWidth = window?.cappy_project_config?.expanded_width || 360;
@@ -51,6 +52,18 @@ function App() {
             if (event.data?.type === 'navigate') {
                 changeView(event.data.view);
             }
+            if (event.data?.type === 'full-screen') {
+                setIsFullscreen(prev => {
+                    const next = !prev;
+                    if (next) {
+                        setSize({ width: Math.floor(window.innerWidth * 0.88), height: Math.floor(window.innerHeight * 0.88) });
+                        setDefaultPosition({ x: 0, y: 0 });
+                    } else {
+                        setSize({ width: defaultExpandedWidth, height: defaultExpandedHeight });
+                    }
+                    return next;
+                });
+            }
         };
         window.addEventListener('message', handler);
         return () => window.removeEventListener('message', handler);
@@ -71,7 +84,7 @@ function App() {
     }
     
     const content = (
-        <div className={`draggable-container ${currentView}`}>
+        <div className={`draggable-container ${currentView}${isFullscreen ? ' fullscreen' : ''}`}>
             <ResizableContainer
                 width={size.width}
                 height={size.height}
