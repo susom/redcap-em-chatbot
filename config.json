@@ -364,7 +364,7 @@
             "type": "textarea"
         },
         {
-            "key": "agent_mode",
+            "key": "agent-mode",
             "name": "<b>Enable Agent Mode (system-wide default)</b><br><i>(experimental)</i> Allows the chatbot to use multi-step agentic workflows with tool execution.",
             "required": false,
             "type": "checkbox"

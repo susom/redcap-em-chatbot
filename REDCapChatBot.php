@@ -442,7 +442,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $this->setIfNotBlank($override_params, "max_tokens", $this->getSetting("project-gpt-max-tokens", null, $config_pid), 'int');
                 $this->setIfNotBlank($override_params, "reasoning", $this->getSetting("project-reasoning-effort", null, $config_pid));
 
-                $agent_mode = (bool) $this->getSetting("agent_mode", null, $config_pid);
+                $agent_mode = (bool) $this->getSetting("agent_mode", null, $config_pid)
+                    ?: (bool) $this->getSystemSetting('agent-mode');
                 if ($agent_mode) {
                     $override_params["agent_mode"] = true;
                 }
