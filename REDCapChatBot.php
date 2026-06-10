@@ -104,6 +104,21 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             echo $file;
         }
         echo '<div id="chatbot_ui_container"></div>';
+        echo '<script>
+(function() {
+    window.addEventListener("message", function(e) {
+        var container = document.getElementById("chatbot_ui_container");
+        if (!container) return;
+        if (e.data && e.data.type === "full-screen") {
+            container.classList.toggle("cappy-fullscreen");
+        }
+        if (e.data && e.data.type === "resize-cappy") {
+            var w = e.data.width, h = e.data.height;
+            if (w && h) { container.style.width = w + "px"; container.style.height = h + "px"; }
+        }
+    });
+})();
+</script>';
     }
 
     public function generateAssetFiles(): array {
