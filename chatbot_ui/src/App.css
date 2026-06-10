@@ -51,14 +51,6 @@
     background: rgba(0,0,0,0.5);
 }
 
-#chatbot_ui_container.cappy-fullscreen .draggable-container.fullscreen {
-    position: absolute;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%);
-    bottom: auto;
-    right: auto;
-}
 
 .App {
     width: auto; /* Make .App fill the container */
