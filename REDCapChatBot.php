@@ -112,10 +112,6 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         if (e.data && e.data.type === "full-screen") {
             container.classList.toggle("cappy-fullscreen");
         }
-        if (e.data && e.data.type === "resize-cappy") {
-            var w = e.data.width, h = e.data.height;
-            if (w && h) { container.style.width = w + "px"; container.style.height = h + "px"; }
-        }
     });
 })();
 </script>';
