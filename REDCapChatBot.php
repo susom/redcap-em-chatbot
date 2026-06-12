@@ -422,6 +422,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 if (empty($rag_namespace)) {
                     $rag_namespace = $this->getSystemSetting('rag_target_namespace');
                 }
+                // Default: match the RAG EM's own storage default (project_{pid})
+                if (empty($rag_namespace) && !empty($config_pid)) {
+                    $rag_namespace = "project_{$config_pid}";
+                }
                 if ($ragInstance && !empty($rag_namespace)) {
                     $ragContext = $ragInstance->getRelevantDocuments($rag_namespace, $messages) ?? [];
                 } else {
