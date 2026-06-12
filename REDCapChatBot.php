@@ -416,21 +416,30 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 // Get RAG EM instance and read namespace from its project settings, fallback to system setting
                 $ragInstance = $this->getRedcapRAGInstance();
                 $rag_namespace = null;
+                // 1. Explicit project-level override (RedcapRAG project setting)
                 if ($ragInstance && !empty($config_pid)) {
                     $rag_namespace = $ragInstance->getProjectSetting('rag_target_namespace', $config_pid);
                 }
-                if (empty($rag_namespace)) {
-                    $rag_namespace = $this->getSystemSetting('rag_target_namespace');
-                }
-                // Default: match the RAG EM's own storage default (project_{pid})
+                // 2. Project context default — project_{pid} (matches RAG storage default)
                 if (empty($rag_namespace) && !empty($config_pid)) {
                     $rag_namespace = "project_{$config_pid}";
                 }
+                // 3. System-level fallback (only when no project context at all)
+                if (empty($rag_namespace)) {
+                    $rag_namespace = $this->getSystemSetting('rag_target_namespace');
+                }
+                $this->emDebug("RAG debug", [
+                    'ragInstance'   => $ragInstance ? get_class($ragInstance) : 'NULL',
+                    'rag_namespace' => $rag_namespace,
+                    'config_pid'    => $config_pid,
+                    'last_msg_role' => end($messages)['role'] ?? 'none',
+                ]);
                 if ($ragInstance && !empty($rag_namespace)) {
                     $ragContext = $ragInstance->getRelevantDocuments($rag_namespace, $messages) ?? [];
                 } else {
                     $ragContext = [];
                 }
+                $this->emDebug("RAG result", ['doc_count' => count($ragContext)]);
                 foreach ($ragContext as $doc) {
                     $this->emDebug("GOT RAG?!", $doc);
                     $messages = $this->appendSystemContext($messages, self::RAG_CONTEXT_PREFIX . $doc['content']);
