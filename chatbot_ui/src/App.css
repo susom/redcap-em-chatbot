@@ -4,7 +4,7 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    z-index: 9999;
+    z-index: 1000000;
     pointer-events: none; /* Allow clicks to pass through */
 }
 
@@ -46,7 +46,7 @@
     left: 0;
     width: 100vw !important;
     height: 100vh !important;
-    z-index: 99999;
+    z-index: 1000001;
     pointer-events: auto;
     background: rgba(0,0,0,0.5);
 }
