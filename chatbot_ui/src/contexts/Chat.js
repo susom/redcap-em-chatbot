@@ -347,41 +347,53 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
         // Check if compression is needed before sending
         const handleCompressedCall = async () => {
-            let contextToSend = [...apiContextRef.current];
+            try {
+                let contextToSend = [...apiContextRef.current];
 
-            if (needsCompression(contextToSend)) {
-                console.log("🗜️ Compressing context before AI call...");
-                contextToSend = await compressContext(contextToSend);
-                // Update apiContext with compressed version
-                updateApiContext(contextToSend);
-            }
-
-            console.log("calling callAI with ", contextToSend);
-
-            window.chatbot_jsmo_module.callAI({
-                messages: contextToSend,
-                session_id: sessionId
-            }, (res) => {
-                setLoading(false); // Clear loading on success
-                if (res && res.response) {
-                    if (payload.meta?.internal) {
-                        // Inject only assistant message for internal triggers
-                        addMessage({ role: 'assistant', content: res.response.content });
-                    } else {
-                        updateMessage(res, userMessageIndex);
-                    }
-                    if (callback) callback();
-                } else {
-                    console.log("Unexpected response format:", res);
-                    setErrorMessage("I received an unexpected response. Please try again.");
-                    if (callback) callback();
+                if (needsCompression(contextToSend)) {
+                    console.log("🗜️ Compressing context before AI call...");
+                    contextToSend = await compressContext(contextToSend);
+                    // Update apiContext with compressed version
+                    updateApiContext(contextToSend);
                 }
-            }, (err) => {
-                setLoading(false); // Clear loading on error
-                console.log("callAI error", err);
-                setErrorMessage("I'm having trouble connecting right now. Please wait a moment and try again.");
+
+                console.log("calling callAI with ", contextToSend);
+
+                if (!window.chatbot_jsmo_module || typeof window.chatbot_jsmo_module.callAI !== 'function') {
+                    throw new Error("chatbot_jsmo_module.callAI is unavailable");
+                }
+
+                window.chatbot_jsmo_module.callAI({
+                    messages: contextToSend,
+                    session_id: sessionId
+                }, (res) => {
+                    setLoading(false); // Clear loading on success
+                    if (res && res.response) {
+                        if (payload.meta?.internal) {
+                            // Inject only assistant message for internal triggers
+                            addMessage({ role: 'assistant', content: res.response.content });
+                        } else {
+                            updateMessage(res, userMessageIndex);
+                        }
+                        if (callback) callback();
+                    } else {
+                        console.log("Unexpected response format:", res);
+                        setErrorMessage("I received an unexpected response. Please try again.");
+                        if (callback) callback();
+                    }
+                }, (err) => {
+                    setLoading(false); // Clear loading on error
+                    console.log("callAI error", err);
+                    setErrorMessage("I'm having trouble connecting right now. Please wait a moment and try again.");
+                    if (callback) callback();
+                });
+            } catch (err) {
+                // Any synchronous/async throw must clear loading so the input never sticks
+                setLoading(false);
+                console.error("callAjax failed:", err);
+                setErrorMessage("Something went wrong sending your message. Please try again.");
                 if (callback) callback();
-            });
+            }
         };
 
         // Execute the async compression + AI call

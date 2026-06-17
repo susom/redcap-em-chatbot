@@ -28,6 +28,7 @@
                     callback(parsedRes);
                 } else {
                     console.log("No response field in parsed response:", parsedRes);
+                    errorCallback(new Error("No response field in AI result"));
                 }
             } catch (err) {
                 errorCallback(err);
