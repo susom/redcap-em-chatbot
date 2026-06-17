@@ -41,22 +41,24 @@ function App() {
         if (viewName === 'splash') {
             if (isFullscreen) exitFullscreen();
             else {
-                // Anchor splash bottom-right to where the chat bottom-right was
-                setDefaultPosition(prev => ({
-                    x: prev.x + size.width  - 120,
-                    y: prev.y + size.height - 120,
-                }));
+                // Always snap splash badge to bottom-right corner
+                setDefaultPosition({
+                    x: window.innerWidth  - 30 - 120,
+                    y: window.innerHeight - 30 - 120,
+                });
             }
             window.parent.postMessage({ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }, '*');
         } else if (viewName === 'home' || viewName === 'history') {
             const config = window?.cappy_project_config || {};
             const w = config.expanded_width  || defaultExpandedWidth;
             const h = config.expanded_height || defaultExpandedHeight;
-            // Anchor chat bottom-right to where the splash bottom-right was
-            setDefaultPosition(prev => ({
-                x: prev.x - (w - 120),
-                y: prev.y - (h - 120),
-            }));
+            // Only reposition when expanding from splash
+            if (currentView === 'splash') {
+                setDefaultPosition(prev => ({
+                    x: prev.x - (w - 120),
+                    y: prev.y - (h - 120),
+                }));
+            }
             window.parent.postMessage({
                 type: 'resize-cappy',
                 source: viewName,
