@@ -11,7 +11,11 @@ import './assets/styles/global.css';
 
 function App() {
     const [currentView, setCurrentView] = useState('splash');
-    const [defaultPosition, setDefaultPosition] = useState({ x: 0, y: 0 });
+    // With top/left CSS anchor, initialize so splash appears at bottom-right (30px margin)
+    const [defaultPosition, setDefaultPosition] = useState(() => ({
+        x: window.innerWidth  - 30 - 120,
+        y: window.innerHeight - 30 - 120,
+    }));
     const [isFullscreen, setIsFullscreen] = useState(false);
 
     const defaultExpandedWidth  = window?.cappy_project_config?.expanded_width  || 360;
@@ -25,7 +29,10 @@ function App() {
     const exitFullscreen = () => {
         setIsFullscreen(false);
         setSize({ width: defaultExpandedWidth, height: defaultExpandedHeight });
-        setDefaultPosition({ x: 0, y: 0 });
+        setDefaultPosition({
+            x: window.innerWidth  - 30 - 120,
+            y: window.innerHeight - 30 - 120,
+        });
         var c = document.getElementById('chatbot_ui_container');
         if (c) c.classList.remove('cappy-fullscreen');
     };
@@ -33,15 +40,28 @@ function App() {
     const changeView = (viewName) => {
         if (viewName === 'splash') {
             if (isFullscreen) exitFullscreen();
-            else setDefaultPosition({ x: 0, y: 0 });
+            else {
+                // Anchor splash bottom-right to where the chat bottom-right was
+                setDefaultPosition(prev => ({
+                    x: prev.x + size.width  - 120,
+                    y: prev.y + size.height - 120,
+                }));
+            }
             window.parent.postMessage({ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }, '*');
         } else if (viewName === 'home' || viewName === 'history') {
             const config = window?.cappy_project_config || {};
+            const w = config.expanded_width  || defaultExpandedWidth;
+            const h = config.expanded_height || defaultExpandedHeight;
+            // Anchor chat bottom-right to where the splash bottom-right was
+            setDefaultPosition(prev => ({
+                x: prev.x - (w - 120),
+                y: prev.y - (h - 120),
+            }));
             window.parent.postMessage({
                 type: 'resize-cappy',
                 source: viewName,
-                width: config.expanded_width || 360,
-                height: config.expanded_height || 520
+                width: w,
+                height: h
             }, '*');
         }
         setCurrentView(viewName);
@@ -61,14 +81,16 @@ function App() {
                     if (next) {
                         const fsWidth  = Math.floor(window.innerWidth  * 0.88);
                         const fsHeight = Math.floor(window.innerHeight * 0.88);
-                        // Offset to center: compensate for CSS bottom:30px right:30px
-                        const cx = Math.floor(30 - window.innerWidth  * 0.06);
-                        const cy = Math.floor(30 - window.innerHeight * 0.06);
+                        const cx = Math.floor((window.innerWidth  - fsWidth)  / 2);
+                        const cy = Math.floor((window.innerHeight - fsHeight) / 2);
                         setSize({ width: fsWidth, height: fsHeight });
                         setDefaultPosition({ x: cx, y: cy });
                     } else {
                         setSize({ width: defaultExpandedWidth, height: defaultExpandedHeight });
-                        setDefaultPosition({ x: 0, y: 0 });
+                        setDefaultPosition({
+                            x: window.innerWidth  - 30 - 120,
+                            y: window.innerHeight - 30 - 120,
+                        });
                     }
                     return next;
                 });
@@ -99,6 +121,7 @@ function App() {
                 height={size.height}
                 minConstraints={[320, 480]}
                 maxConstraints={[1400, 1000]}
+                onResize={(e, data) => setSize({ width: data.size.width, height: data.size.height })}
                 onResizeStop={(e, data) => setSize({ width: data.size.width, height: data.size.height })}
             >
                 {currentView !== 'splash' ? (

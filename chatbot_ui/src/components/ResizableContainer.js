@@ -2,7 +2,7 @@ import React from 'react';
 import { ResizableBox } from 'react-resizable';
 import 'react-resizable/css/styles.css';
 
-const ResizableContainer = ({ children, width, height, minConstraints, maxConstraints, onResizeStop }) => {
+const ResizableContainer = ({ children, width, height, minConstraints, maxConstraints, onResizeStop, onResize }) => {
     return (
         <ResizableBox
             width={width}
@@ -10,6 +10,7 @@ const ResizableContainer = ({ children, width, height, minConstraints, maxConstr
             minConstraints={minConstraints}
             maxConstraints={maxConstraints}
             resizeHandles={['se']}
+            onResize={onResize}
             onResizeStop={onResizeStop}
             lockAspectRatio={false} // Lock aspect ratio disabled for flexibility
         >
