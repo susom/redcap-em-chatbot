@@ -53,13 +53,31 @@ export function History({ changeView }) {
         changeView("home");
     }
 
+    const getSessionTitle = (session) => {
+        const queries = session.queries || [];
+        // Prefer the most recent real user query, skipping internal/injected messages
+        for (let i = queries.length - 1; i >= 0; i--) {
+            const q = queries[i];
+            if (q && q.user_content && !q.meta?.internal) {
+                return q.user_content;
+            }
+        }
+        // Fallback: any user query (even internal) or empty
+        for (let i = queries.length - 1; i >= 0; i--) {
+            if (queries[i] && queries[i].user_content) {
+                return queries[i].user_content;
+            }
+        }
+        return "";
+    };
+
     const displayChats = (sessions) => {
         return sessions.map((session, index) => {
-            const firstQuery = session.queries.length > 0 ? session.queries[0].user_content : "";
+            const title = getSessionTitle(session);
             return (
                 <Row className={`history session`} key={index}>
                     <Col xs={{ span: 4 }} className={`history_date soft_text`}>{formatTimestamp(session.timestamp)}</Col>
-                    <Col xs={{ span: 7 }} className={`history_query soft_text`} onClick={() => { handleDisplaySession(session.session_id) }}>{truncateString(firstQuery, 38)}</Col>
+                    <Col xs={{ span: 7 }} className={`history_query soft_text`} onClick={() => { handleDisplaySession(session.session_id) }}>{truncateString(title, 38)}</Col>
                     <Col xs={1} className={`soft_text trashit`} onClick={() => { handleDelete(session.session_id) }}><Trash color="#666" size={20} /></Col>
                 </Row>
             );
