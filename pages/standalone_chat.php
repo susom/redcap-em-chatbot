@@ -60,6 +60,7 @@ $build_files    = $module->generateAssetFiles();
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <script>
     window.cappy_project_config = {
+        pid: <?= json_encode($config_pid ?: null) ?>,
         title: <?= json_encode($title) ?>,
         intro: <?= json_encode($intro_text) ?>,
         current_user: <?=json_encode($globalUsername) ?>,

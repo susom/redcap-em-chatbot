@@ -6,25 +6,50 @@ import Home from './views/Home';
 import History from './views/History';
 import Draggable from 'react-draggable';
 import ResizableContainer from './components/ResizableContainer';
+import { loadUiState, saveUiState } from './components/utils/persistence';
 import './App.css';
 import './assets/styles/global.css';
 
 function App() {
-    const [currentView, setCurrentView] = useState('splash');
-    // With top/left CSS anchor, initialize so splash appears at bottom-right (30px margin)
-    const [defaultPosition, setDefaultPosition] = useState(() => ({
-        x: window.innerWidth  - 30 - 120,
-        y: window.innerHeight - 30 - 120,
-    }));
-    const [isFullscreen, setIsFullscreen] = useState(false);
-
     const defaultExpandedWidth  = window?.cappy_project_config?.expanded_width  || 360;
     const defaultExpandedHeight = window?.cappy_project_config?.expanded_height || 520;
 
-    const [size, setSize] = useState({
-        width:  defaultExpandedWidth,
-        height: defaultExpandedHeight
+    // Restore prior UI state (per-project, idle-expiring). Fullscreen is not
+    // restored — reopen as a normal expanded widget to avoid backdrop races.
+    const persistedUi = loadUiState();
+    const restoredExpanded = persistedUi && !persistedUi.isFullscreen;
+
+    const splashPosition = () => ({
+        x: window.innerWidth  - 30 - 120,
+        y: window.innerHeight - 30 - 120,
     });
+
+    const [currentView, setCurrentView] = useState(persistedUi?.view || 'splash');
+    const [defaultPosition, setDefaultPosition] = useState(() => (
+        restoredExpanded && persistedUi.position ? persistedUi.position : splashPosition()
+    ));
+    const [isFullscreen, setIsFullscreen] = useState(false);
+
+    const [size, setSize] = useState(
+        restoredExpanded && persistedUi.size
+            ? persistedUi.size
+            : { width: defaultExpandedWidth, height: defaultExpandedHeight }
+    );
+
+    // Persist UI state whenever it changes
+    useEffect(() => {
+        saveUiState({ view: currentView, position: defaultPosition, size, isFullscreen });
+    }, [currentView, defaultPosition, size, isFullscreen]);
+
+    // On mount, sync the host iframe sizing to the restored view
+    useEffect(() => {
+        if (currentView === 'splash') {
+            window.parent.postMessage({ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }, '*');
+        } else {
+            window.parent.postMessage({ type: 'resize-cappy', source: currentView, width: size.width, height: size.height }, '*');
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const exitFullscreen = () => {
         setIsFullscreen(false);

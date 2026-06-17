@@ -1,13 +1,15 @@
 import React, { createContext, useState, useRef, useEffect } from 'react';
 import { saveNewSession, updateSession, getSession } from '../components/database/dexie';
+import { loadUiState, saveUiState } from '../components/utils/persistence';
 
 export const ChatContext = createContext();
 
 export const ChatContextProvider = ({ children , projectContextRef}) => {
+    const persistedUi = loadUiState();
     const [apiContext, setApiContext] = useState([]);
     const [chatContext, setChatContext] = useState([]);
     const [showRatingPO, setShowRatingPO] = useState(false);
-    const [sessionId, setSessionId] = useState(Date.now().toString());
+    const [sessionId, setSessionId] = useState(persistedUi?.sessionId || Date.now().toString());
     const [messages, setMessages] = useState([]);
     const [msgCount, setMsgCount] = useState(0);
     const [errorMessage, setErrorMessage] = useState(null);
@@ -72,6 +74,52 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Restore the active session from Dexie on mount (per-project, idle-expiring).
+    // Rebuilds apiContext from saved turns so the conversation can continue.
+    useEffect(() => {
+        const restoreSession = async () => {
+            const ui = loadUiState();
+            if (!ui?.sessionId) return;
+            const session = await getSession(ui.sessionId);
+            if (!session || !Array.isArray(session.queries) || session.queries.length === 0) return;
+
+            const queries = session.queries;
+            chatContextRef.current = queries;
+            setChatContext(queries);
+            setMessages(queries);
+            setMsgCount(queries.length);
+
+            // Rebuild apiContext (ChatML) from saved display turns
+            const rebuilt = [];
+            queries.forEach((q, i) => {
+                if (q.user_content) {
+                    rebuilt.push({ role: 'user', content: q.user_content, index: i, meta: q.meta ?? undefined });
+                }
+                if (q.assistant_content) {
+                    rebuilt.push({ role: 'assistant', content: q.assistant_content, index: i });
+                }
+            });
+            apiContextRef.current = rebuilt;
+            setApiContext(rebuilt);
+
+            // Don't re-inject the username greeting if it's already in history
+            const hasUsername = queries.some(
+                q => q.meta?.internal && typeof q.user_content === 'string' && q.user_content.startsWith('My name is')
+            );
+            if (hasUsername) injectedUsername.current = true;
+
+            // Delta export pointer starts at the end of restored history
+            lastExportedRef.current = rebuilt.length;
+        };
+        restoreSession();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Persist the active session id (and refresh the idle timer)
+    useEffect(() => {
+        saveUiState({ sessionId });
+    }, [sessionId]);
+
     const updateApiContext = (newContext) => {
         apiContextRef.current = newContext;
         setApiContext(newContext);
@@ -79,6 +127,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
     const saveChatContext = async () => {
         if (sessionId && chatContextRef.current.length > 0) {
+            saveUiState({ sessionId }); // refresh idle timer on activity
             const currentSession = await getSession(sessionId);
             if (currentSession) {
                 await updateSession(sessionId, chatContextRef.current);

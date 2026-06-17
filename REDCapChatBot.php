@@ -94,6 +94,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         }
 
         echo '<script>window.cappy_project_config = ' . json_encode([
+            'pid'                        => $config_pid ?: null,
             'title'                      => $title,
             'intro'                      => $intro_text,
             'current_user'               => $globalUsername,
