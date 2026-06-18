@@ -21,6 +21,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     const DYNAMIC_CONTEXT_LABEL = "Active Project Context";
     const CONVERSATION_SUMMARY_LABEL = "Previous Conversation Summary";
     const injectedUsername = useRef(false);
+    const hasGreeted = useRef(false);
 
     // Context compression settings
     const COMPRESSION_THRESHOLD = 20; // Trigger compression after 20 messages
@@ -304,6 +305,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         setMsgCount(0);
         setMessages([]);
         setSessionId(newSessionId);
+        hasGreeted.current = false;
 
         // Filter apiContext to keep only "system" roles
         const filteredApiContext = apiContextRef.current.filter(entry => entry.role === "system");
@@ -312,6 +314,21 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
         setChatContext([]);
         setApiContext(filteredApiContext);
+    };
+
+    // Preemptive invisible greeting: fired when the user opens the widget at the
+    // start of a session. Sends a hidden prompt so Cappy appears to greet first.
+    const greet = () => {
+        const prompt = window.cappy_project_config?.chat_initiator;
+        if (!prompt || !prompt.trim()) return;
+        if (hasGreeted.current) return;
+        // Only greet at the start of a session (no existing conversation).
+        if (chatContextRef.current.length > 0) return;
+
+        hasGreeted.current = true;
+        const payload = { content: prompt, meta: { internal: true } };
+        addMessage({ role: 'user', content: payload.content, meta: payload.meta });
+        callAjax(payload, null, true);
     };
 
     const replaceSession = async (session) => {
@@ -432,7 +449,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     };
 
     return (
-        <ChatContext.Provider value={{ messages, addMessage, clearMessages, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote, deleteInteraction, errorMessage, clearError, loading }}>
+        <ChatContext.Provider value={{ messages, addMessage, clearMessages, greet, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote, deleteInteraction, errorMessage, clearError, loading }}>
             {children}
         </ChatContext.Provider>
     );

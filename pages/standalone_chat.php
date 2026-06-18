@@ -14,6 +14,7 @@ if (!empty($config_pid)) {
     $escalation_guidance = $module->getProjectSetting('project_escalation_prompt_guidance', $config_pid);
     $title = $module->getProjectSetting('project_chatbot_title', $config_pid);
     $intro_text = $module->getProjectSetting('project_chatbot_intro', $config_pid);
+    $chat_initiator = $module->getProjectSetting('project_chat_initiator', $config_pid) ?: '';
     $allowed_namespaces = $module->getProjectSetting('project_allowed_context_namespaces', $config_pid) ?: '';
     $expanded_width = $module->getProjectSetting('project_expanded_width', $config_pid);
     $expanded_height = $module->getProjectSetting('project_expanded_height', $config_pid);
@@ -25,6 +26,7 @@ if (!empty($config_pid)) {
     $escalation_guidance = null;
     $title = null;
     $intro_text = null;
+    $chat_initiator = '';
     $allowed_namespaces = '';
     $expanded_width = null;
     $expanded_height = null;
@@ -63,6 +65,7 @@ $build_files    = $module->generateAssetFiles();
         pid: <?= json_encode($config_pid ?: null) ?>,
         title: <?= json_encode($title) ?>,
         intro: <?= json_encode($intro_text) ?>,
+        chat_initiator: <?= json_encode($chat_initiator) ?>,
         current_user: <?=json_encode($globalUsername) ?>,
         expanded_width: <?= json_encode($expanded_width) ?>,
         expanded_height: <?= json_encode($expanded_height) ?>,

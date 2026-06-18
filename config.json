@@ -86,6 +86,12 @@
             "type": "textarea"
         },
         {
+            "key": "project_chat_initiator",
+            "name": "<b>Preemptive Greeting Prompt</b><br><i>(optional)</i> When set, this invisible prompt is sent the moment a user opens the chat from the badge at the <b>start of a session</b>, so Cappy appears to greet them proactively. The prompt itself is hidden; only Cappy's reply is shown. Leave blank to disable.",
+            "required": false,
+            "type": "textarea"
+        },
+        {
             "key": "project_allowed_context_namespaces",
             "name": "Allowed context namespaces for postMessage injection (comma separated, e.g. rexi-dashboard, rexi-project, rexi-memory)",
             "required": false,

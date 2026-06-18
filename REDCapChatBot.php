@@ -73,6 +73,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         if (!empty($config_pid)) {
             $title             = $this->getProjectSetting('project_chatbot_title', $config_pid);
             $intro_text        = $this->getProjectSetting('project_chatbot_intro', $config_pid);
+            $chat_initiator    = $this->getProjectSetting('project_chat_initiator', $config_pid) ?: '';
             $allowed_ns        = $this->getProjectSetting('project_allowed_context_namespaces', $config_pid) ?: '';
             $expanded_width    = $this->getProjectSetting('project_expanded_width', $config_pid);
             $expanded_height   = $this->getProjectSetting('project_expanded_height', $config_pid);
@@ -80,6 +81,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $custom_css        = $this->getProjectSetting('project_chatbot_custom_css', $config_pid) ?? '';
         } else {
             $title = $intro_text = $allowed_ns = $expanded_width = $expanded_height = null;
+            $chat_initiator = '';
             $hide_message_meta = 0;
             $custom_css = '';
         }
@@ -97,6 +99,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             'pid'                        => $config_pid ?: null,
             'title'                      => $title,
             'intro'                      => $intro_text,
+            'chat_initiator'             => $chat_initiator,
             'current_user'               => $globalUsername,
             'expanded_width'             => $expanded_width,
             'expanded_height'            => $expanded_height,

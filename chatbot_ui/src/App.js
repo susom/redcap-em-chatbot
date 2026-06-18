@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import Header from './components/header/header';
 import Footer from './components/footer/footer';
 import Splash from './views/Splash';
@@ -7,10 +7,12 @@ import History from './views/History';
 import Draggable from 'react-draggable';
 import ResizableContainer from './components/ResizableContainer';
 import { loadUiState, saveUiState } from './components/utils/persistence';
+import { ChatContext } from './contexts/Chat';
 import './App.css';
 import './assets/styles/global.css';
 
 function App() {
+    const { greet } = useContext(ChatContext);
     const defaultExpandedWidth  = window?.cappy_project_config?.expanded_width  || 360;
     const defaultExpandedHeight = window?.cappy_project_config?.expanded_height || 520;
 
@@ -83,6 +85,9 @@ function App() {
                     x: prev.x - (w - 120),
                     y: prev.y - (h - 120),
                 }));
+                // Badge-open at the start of a session: fire the preemptive
+                // greeting (no-op unless configured and chat is empty).
+                if (typeof greet === 'function') greet();
             }
             window.parent.postMessage({
                 type: 'resize-cappy',
