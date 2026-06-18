@@ -10,6 +10,9 @@ export const Messages = () => {
     const newQaRef = useRef(null);
 
     const introText = window.cappy_project_config?.intro || "Hi I am Cappy! Your REDCap Support buddy. How can I assist you today?";
+    // When a preemptive greeting is configured, Cappy greets proactively, so
+    // suppress the empty-state intro text to avoid clutter.
+    const hasInitiator = !!(window.cappy_project_config?.chat_initiator || '').trim();
 
     // Convert bullet points to proper markdown format
     const formatMarkdown = (text) => {
@@ -136,7 +139,7 @@ export const Messages = () => {
                     </React.Fragment>
                 ))
             ) : (
-                <p className={`empty`}><em className={`soft_text`}>{introText}</em></p>
+                !hasInitiator && <p className={`empty`}><em className={`soft_text`}>{introText}</em></p>
             )}
             {chat_context.loading && (
                 <dl className="loading-dl">
