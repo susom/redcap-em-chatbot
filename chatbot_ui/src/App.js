@@ -14,7 +14,10 @@ import './assets/styles/global.css';
 function App() {
     const { greet } = useContext(ChatContext);
     const defaultExpandedWidth  = window?.cappy_project_config?.expanded_width  || 360;
-    const defaultExpandedHeight = window?.cappy_project_config?.expanded_height || 520;
+    // Default to 80% of the viewport height (capped at the resize max) when the
+    // project hasn't set an explicit expanded_height.
+    const defaultExpandedHeight = window?.cappy_project_config?.expanded_height
+        || Math.min(Math.floor(window.innerHeight * 0.8), 1000);
 
     // Restore prior UI state (per-project, idle-expiring). Fullscreen is not
     // restored — reopen as a normal expanded widget to avoid backdrop races.
@@ -56,9 +59,11 @@ function App() {
     const exitFullscreen = () => {
         setIsFullscreen(false);
         setSize({ width: defaultExpandedWidth, height: defaultExpandedHeight });
+        // Anchor the expanded widget's bottom-right to where the badge's
+        // bottom-right sits (30px margins), so it stays on-screen.
         setDefaultPosition({
-            x: window.innerWidth  - 30 - 120,
-            y: window.innerHeight - 30 - 120,
+            x: window.innerWidth  - 30 - defaultExpandedWidth,
+            y: window.innerHeight - 30 - defaultExpandedHeight,
         });
         var c = document.getElementById('chatbot_ui_container');
         if (c) c.classList.remove('cappy-fullscreen');
@@ -81,10 +86,13 @@ function App() {
             const h = config.expanded_height || defaultExpandedHeight;
             // Only reposition when expanding from splash
             if (currentView === 'splash') {
-                setDefaultPosition(prev => ({
-                    x: prev.x - (w - 120),
-                    y: prev.y - (h - 120),
-                }));
+                // Set the size and anchor the bottom-right to the badge's
+                // bottom-right (30px margins) so both stay in sync.
+                setSize({ width: w, height: h });
+                setDefaultPosition({
+                    x: window.innerWidth  - 30 - w,
+                    y: window.innerHeight - 30 - h,
+                });
                 // Badge-open at the start of a session: fire the preemptive
                 // greeting (no-op unless configured and chat is empty).
                 if (typeof greet === 'function') greet();
@@ -119,9 +127,11 @@ function App() {
                         setDefaultPosition({ x: cx, y: cy });
                     } else {
                         setSize({ width: defaultExpandedWidth, height: defaultExpandedHeight });
+                        // Anchor bottom-right to the badge's bottom-right so the
+                        // shrunk widget stays on-screen instead of overflowing.
                         setDefaultPosition({
-                            x: window.innerWidth  - 30 - 120,
-                            y: window.innerHeight - 30 - 120,
+                            x: window.innerWidth  - 30 - defaultExpandedWidth,
+                            y: window.innerHeight - 30 - defaultExpandedHeight,
                         });
                     }
                     return next;
@@ -131,6 +141,34 @@ function App() {
         window.addEventListener('message', handler);
         return () => window.removeEventListener('message', handler);
     }, [isFullscreen]);
+
+    // Keep the widget on-screen when the viewport is resized smaller: re-anchor
+    // its bottom-right to where the badge's bottom-right sits (30px margins).
+    useEffect(() => {
+        const onResize = () => {
+            if (isFullscreen) {
+                const fsWidth  = Math.floor(window.innerWidth  * 0.88);
+                const fsHeight = Math.floor(window.innerHeight * 0.88);
+                setSize({ width: fsWidth, height: fsHeight });
+                setDefaultPosition({
+                    x: Math.floor((window.innerWidth  - fsWidth)  / 2),
+                    y: Math.floor((window.innerHeight - fsHeight) / 2),
+                });
+            } else if (currentView === 'splash') {
+                setDefaultPosition({
+                    x: window.innerWidth  - 30 - 120,
+                    y: window.innerHeight - 30 - 120,
+                });
+            } else {
+                setDefaultPosition({
+                    x: window.innerWidth  - 30 - size.width,
+                    y: window.innerHeight - 30 - size.height,
+                });
+            }
+        };
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, [isFullscreen, currentView, size.width, size.height]);
 
     let ViewComponent;
     switch (currentView) {

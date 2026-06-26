@@ -1,7 +1,7 @@
 import React , {useState} from "react";
 import { Container } from 'react-bootstrap';
 import { Archive, ChatDots } from 'react-bootstrap-icons';
-import { ArrowsFullscreen } from 'react-bootstrap-icons'; 
+import { BorderBottom } from 'react-bootstrap-icons'; 
 import { DashLg } from 'react-bootstrap-icons';
 import "./header.css";
 
@@ -16,14 +16,14 @@ function Header({ changeView }) {
     return (
         <Container className="rcchat_header handle">
             <h1>
-                <span className="logo" onClick={() => changeView('splash')}></span>
+                <span className="logo"></span>
                 {headerText}
                 
                 <button onClick={() => changeView('splash')} className="collapseit">
                     <DashLg size={16} />
                 </button>
                 <button onClick={toggleFullscreen} className="fullscreen">
-                    <ArrowsFullscreen size={16} />
+                    <BorderBottom size={16} />
                 </button>
                 <button onClick={() => changeView('history')} className="archive">
                     <Archive size={16}/>
