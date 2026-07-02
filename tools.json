@@ -1,0 +1,44 @@
+{
+  "_note": "Cappy's own agent tools. These are FRONTEND/UI actions executed client-side by assets/cappy-actions.js (the in-page renderer). The server handlers in REDCapChatBot::redcap_module_api just echo intent so the SecureChatAI agent loop can continue; the actual highlight/fill happens in the browser from the tools_used arguments. To activate, add this module's prefix (redcap-em-chatbot) to SecureChatAI's project_agent_tool_em_prefixes (or the system-level agent_tool_em_prefixes).",
+  "tools": [
+    {
+      "name": "page.highlight",
+      "description": "Highlight (draw a gold ring around) a field or element on the REDCap page the user is CURRENTLY viewing, to show them where to click or look. Use this whenever the user asks you to point to, show, highlight, or find something on the page. Provide EITHER field (a REDCap field/variable name) OR control_id (from the 'Page elements' list given in context).",
+      "action": "page_highlight",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string", "description": "REDCap variable/field name to highlight (for data-entry fields)" },
+          "control_id": { "type": "string", "description": "control_id of a page element (button/link/tab) from the 'Page elements' list in context" },
+          "label": { "type": "string", "description": "Optional human-friendly label to show on the highlight" }
+        }
+      },
+      "readOnly": true,
+      "destructive": false
+    },
+    {
+      "name": "page.fill",
+      "description": "Propose a value for a data-entry field on the REDCap page the user is currently viewing. The user is shown a confirmation prompt before the value is written to the page. Provide the REDCap field/variable name and the value.",
+      "action": "page_fill",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string", "description": "REDCap variable/field name to fill" },
+          "value": { "type": "string", "description": "Value to propose for the field" },
+          "label": { "type": "string", "description": "Optional human-friendly label for the confirmation prompt" }
+        },
+        "required": ["field", "value"]
+      },
+      "readOnly": false,
+      "destructive": false
+    },
+    {
+      "name": "page.clearHighlights",
+      "description": "Remove any highlight rings currently drawn on the REDCap page the user is viewing.",
+      "action": "page_clearHighlights",
+      "parameters": { "type": "object", "properties": {} },
+      "readOnly": true,
+      "destructive": false
+    }
+  ]
+}

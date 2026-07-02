@@ -113,6 +113,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             echo $file;
         }
         echo '<div id="chatbot_ui_container"></div>';
+        // In-page action layer (scan / highlight / fill). Loads AFTER the JSMO bridge so
+        // it can wrap callAI. Same-origin — no extension needed.
+        echo '<script src="' . $this->getUrl('assets/cappy-actions.js', true) . '"></script>';
         echo '<script>
 (function() {
     window.addEventListener("message", function(e) {
@@ -222,7 +225,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      *
      * @return string Formatted project context string.
      */
-    public function getREDCapProjectContext()
+    public function getREDCapProjectContext($instrument = null)
     {
         global $Proj;
 
@@ -231,14 +234,46 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             return false;
         }
 
-        // Define cache parameters
-        $cacheFile = sys_get_temp_dir() . "/redcap_project_metadata_{$Proj->project_id}.json";
-        $cacheDuration = 3600; // Cache duration in seconds (e.g., 1 hour)
+        // **Fields** — the actual bloat. Scope to the CURRENT instrument when known:
+        //  - active instrument  -> full detail (choices/branching/validation) for just that form
+        //  - no instrument       -> slim name/label/type list for all fields (avoids dumping the
+        //                           entire, possibly huge, dictionary into every prompt)
+        $fields = [];
+        foreach ($Proj->metadata as $field) {
+            $formName = $field['form_name'] ?? null;
+            if ($instrument && $formName !== $instrument) {
+                continue;
+            }
+            if ($instrument) {
+                $fields[] = [
+                    'FieldName'      => $field['field_name'],
+                    'FieldLabel'     => $field['field_label'],
+                    'FieldType'      => $field['field_type'],
+                    'Form'           => $formName,
+                    'Choices'        => $field['element_enum'] ?? ($field['select_choices_or_calculations'] ?? ''),
+                    'BranchingLogic' => $field['branching_logic'] ?? '',
+                    'Validation'     => $field['element_validation_type'] ?? ($field['text_validation_type_or_show_slider_number'] ?? ''),
+                ];
+            } else {
+                $fields[] = [
+                    'FieldName'  => $field['field_name'],
+                    'FieldLabel' => $field['field_label'],
+                    'FieldType'  => $field['field_type'],
+                    'Form'       => $formName,
+                ];
+            }
+        }
 
-        // Check if cached data exists and is still valid
-        if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheDuration)) {
+        // Cache key carries a SIGNATURE of the scoped fields, so a data-dictionary edit
+        // invalidates it immediately (the old fixed 1h TTL served stale context after edits).
+        // A short mtime TTL still refreshes the project-wide bits (roles/surveys) periodically.
+        $scope     = $instrument ?: 'all';
+        $signature = substr(md5(json_encode($fields)), 0, 12);
+        $cacheFile = sys_get_temp_dir() . "/redcap_ctx_{$Proj->project_id}_{$scope}_{$signature}.json";
+        $cacheTtl  = 3600;
+        if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTtl)) {
             $cachedData = file_get_contents($cacheFile);
-            if ($cachedData) {
+            if ($cachedData !== false && $cachedData !== '') {
                 return $cachedData;
             }
         }
@@ -255,6 +290,9 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
         // **2. Instruments (Forms/Surveys)**
         $projectMetadata['Instruments'] = array_keys($Proj->forms);
+        if ($instrument) {
+            $projectMetadata['CurrentInstrument'] = $instrument;
+        }
 
         // **3. Events (For Longitudinal Projects)**
         if ($Proj->longitudinal) {
@@ -280,51 +318,14 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             $projectMetadata['DataAccessGroups'] = $dataAccessGroups;
         }
 
-        // **5. User Roles and Permissions**
-        $userRights = REDCap::getUserRights();
-        $userRoles = [];
-        foreach ($userRights as $username => $rights) {
-            $userRoles[] = [
-                'Username' => $username,
-                'Role' => $rights['role'] ?? 'No Role',
-                'Data Access Groups' => $rights['group_id'] ?? 'None'
-            ];
-        }
-        $projectMetadata['UserRoles'] = $userRoles;
-
-        // **6. Custom Project Attributes (e.g., IRB Number)**
-        // Replace 'irb_number_field' with the actual field name where IRB number is stored
-        // If IRB number is stored in project notes or another custom attribute, adjust accordingly
+        // **5. Custom Project Attributes (e.g., IRB Number)**
         $projectMetadata['IRBNumber'] = $Proj->project['irb_number_field'] ?? 'N/A';
 
-        // **7. Branching Logic and Calculations (Optional)**
-        // You can extract more detailed field information if needed
-        $fields = [];
-        foreach ($Proj->metadata as $field) {
-            $fields[] = [
-                'FieldName' => $field['field_name'],
-                'FieldLabel' => $field['field_label'],
-                'FieldType' => $field['field_type'],
-                'Choices' => $field['select_choices_or_calculations'] ?? '',
-                'BranchingLogic' => $field['branching_logic'] ?? '',
-                'Validation' => $field['text_validation_type_or_show_slider_number'] ?? ''
-            ];
-        }
+        // **6. Fields (scoped — see above)**
         $projectMetadata['Fields'] = $fields;
-
-        // **8. Surveys Information (If Applicable)**
-        if (!empty($Proj->surveys)) {
-            $surveys = [];
-            foreach ($Proj->surveys as $surveyId => $survey) {
-                $surveys[] = [
-                    'SurveyTitle' => $survey['title'],
-                    'SurveyAuth' => $survey['auth'] ?? 'N/A',
-                    'SurveyEmailInvitation' => $survey['email_inv'] ?? 'N/A',
-                    // Add more survey-specific attributes as needed
-                ];
-            }
-            $projectMetadata['Surveys'] = $surveys;
-        }
+        $projectMetadata['FieldScope'] = $instrument
+            ? "Detailed fields for the current instrument ({$instrument}). For another instrument's fields, ask the user which one."
+            : "Field names only across all instruments. Open an instrument for full field detail.";
 
         // **Convert the associative array to JSON**
         $json = json_encode($projectMetadata, JSON_PRETTY_PRINT);
@@ -381,6 +382,41 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
     
 
+    /**
+     * Agent tool endpoint (SecureChatAI calls this directly per tools.json).
+     *
+     * These are Cappy FRONTEND actions: the highlight/fill happens client-side in
+     * assets/cappy-actions.js from the tools_used arguments. The server only echoes
+     * intent so the agent loop can continue. Requires this module's prefix
+     * (redcap-em-chatbot) in SecureChatAI's *_agent_tool_em_prefixes setting.
+     */
+    public function redcap_module_api($action = null, $payload = [])
+    {
+        switch ($action) {
+            case "page_highlight":
+                $target = $payload['field'] ?? ($payload['control_id'] ?? null);
+                return [
+                    "status" => "highlighted",
+                    "target" => $target,
+                    "note"   => "The highlight is being drawn on the user's page."
+                ];
+
+            case "page_fill":
+                return [
+                    "status" => "proposed_awaiting_confirmation",
+                    "field"  => $payload['field'] ?? null,
+                    "note"   => "The value was proposed on the user's page; they must confirm before it is written."
+                ];
+
+            case "page_clearHighlights":
+                return ["status" => "cleared"];
+
+            default:
+                return ["error" => true, "message" => "Unknown action: $action"];
+        }
+    }
+
+
     public function redcap_module_ajax($action, $payload, $project_id=null, $record, $instrument, $event_id, $repeat_instance,
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
         switch ($action) {
@@ -409,7 +445,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
                 $inject_metadata = !empty($config_pid) ? $this->getProjectSetting('inject-project-metadata', $config_pid) : false;
                 if ($inject_metadata) {
-                    $current_project_context = $this->getREDCapProjectContext();
+                    $current_project_context = $this->getREDCapProjectContext($instrument);
                     if (!empty($current_project_context)) {
                         $current_project_context = "Project Metadata:\n" . $current_project_context;
                         $messages = $this->appendSystemContext($messages, $current_project_context);
