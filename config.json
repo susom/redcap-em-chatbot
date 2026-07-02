@@ -80,6 +80,12 @@
             "type": "checkbox"
         },
         {
+            "key": "enable_page_actions",
+            "name": "<b>Enable Page Actions</b><br><i>(experimental)</i> Lets Cappy highlight and fill fields/elements on the current REDCap page via the <code>page.*</code> agent tools. Also requires this module's prefix (<code>redcap-em-chatbot</code>) in SecureChatAI's Agent Tool EM Prefixes.",
+            "required": false,
+            "type": "checkbox"
+        },
+        {
             "key": "project_chatbot_intro",
             "name": "Chat Intro Messaging",
             "required": false,

@@ -114,8 +114,14 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         }
         echo '<div id="chatbot_ui_container"></div>';
         // In-page action layer (scan / highlight / fill). Loads AFTER the JSMO bridge so
-        // it can wrap callAI. Same-origin — no extension needed.
-        echo '<script src="' . $this->getUrl('assets/cappy-actions.js', true) . '"></script>';
+        // it can wrap callAI. Same-origin — no extension needed. Gated behind the
+        // "Enable Page Actions" project setting so it's fully dormant (no script, no tool
+        // advertising, no page scan) unless explicitly turned on for the project.
+        $pageActionsEnabled = !empty($config_pid)
+            && (bool) $this->getProjectSetting('enable_page_actions', $config_pid);
+        if ($pageActionsEnabled) {
+            echo '<script src="' . $this->getUrl('assets/cappy-actions.js', true) . '"></script>';
+        }
         echo '<script>
 (function() {
     window.addEventListener("message", function(e) {
