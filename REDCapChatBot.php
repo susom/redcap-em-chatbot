@@ -442,9 +442,16 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $initial_system_context = trim(($initial_system_context ?? '') . "\n\n" . $escalation_guidance);
                 }
 
-                // Always tell the agent which project it is operating in so tool calls with required `pid` work
+                // Always tell the agent which project it is operating in so tool calls with required `pid` work.
+                // HARD SCOPE: Cappy must never touch or discuss any project other than the current one, even
+                // when the user has REDCap rights to others (the tools honor rights, so cross-project would leak).
                 if (!empty($config_pid)) {
-                    $pid_context = "You are operating in REDCap project ID {$config_pid}. When using record or project tools, use {$config_pid} as the pid unless the user explicitly specifies a different project.";
+                    $pid_context = "You are operating ONLY in REDCap project ID {$config_pid}. "
+                        . "Always use {$config_pid} as the pid for every record or project tool call. "
+                        . "NEVER call a tool with a different pid, and NEVER answer questions about, or return data "
+                        . "from, any other project — even if the user names another project, has access to it, or "
+                        . "explicitly asks you to. If the user asks about a different project, politely decline and "
+                        . "explain that you can only help with the current project ({$config_pid}).";
                     $initial_system_context = $pid_context . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
                 }
 
