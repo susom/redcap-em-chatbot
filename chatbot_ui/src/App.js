@@ -142,29 +142,46 @@ function App() {
         return () => window.removeEventListener('message', handler);
     }, [isFullscreen]);
 
-    // Keep the widget on-screen when the viewport is resized smaller: re-anchor
-    // its bottom-right to where the badge's bottom-right sits (30px margins).
+    // Keep the widget fully on-screen when the viewport shrinks (e.g. moving the
+    // browser from a large monitor to a smaller laptop screen). We clamp the SIZE to
+    // the viewport first — otherwise re-anchoring bottom-right with a width/height
+    // larger than the screen pushes the widget half off the left/top edge.
     useEffect(() => {
         const onResize = () => {
+            const margin = 30;
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+
             if (isFullscreen) {
-                const fsWidth  = Math.floor(window.innerWidth  * 0.88);
-                const fsHeight = Math.floor(window.innerHeight * 0.88);
+                const fsWidth  = Math.floor(vw * 0.88);
+                const fsHeight = Math.floor(vh * 0.88);
                 setSize({ width: fsWidth, height: fsHeight });
                 setDefaultPosition({
-                    x: Math.floor((window.innerWidth  - fsWidth)  / 2),
-                    y: Math.floor((window.innerHeight - fsHeight) / 2),
+                    x: Math.floor((vw - fsWidth)  / 2),
+                    y: Math.floor((vh - fsHeight) / 2),
                 });
-            } else if (currentView === 'splash') {
-                setDefaultPosition({
-                    x: window.innerWidth  - 30 - 120,
-                    y: window.innerHeight - 30 - 120,
-                });
-            } else {
-                setDefaultPosition({
-                    x: window.innerWidth  - 30 - size.width,
-                    y: window.innerHeight - 30 - size.height,
-                });
+                return;
             }
+
+            if (currentView === 'splash') {
+                setDefaultPosition({
+                    x: Math.max(margin, vw - margin - 120),
+                    y: Math.max(margin, vh - margin - 120),
+                });
+                return;
+            }
+
+            // Expanded: shrink to fit the viewport (respect min constraints), then
+            // re-anchor bottom-right but never past the top/left edges.
+            const w = Math.min(size.width,  Math.max(320, vw - margin * 2));
+            const h = Math.min(size.height, Math.max(480, vh - margin * 2));
+            if (w !== size.width || h !== size.height) {
+                setSize({ width: w, height: h });
+            }
+            setDefaultPosition({
+                x: Math.max(margin, vw - margin - w),
+                y: Math.max(margin, vh - margin - h),
+            });
         };
         window.addEventListener('resize', onResize);
         return () => window.removeEventListener('resize', onResize);
