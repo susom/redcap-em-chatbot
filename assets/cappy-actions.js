@@ -134,8 +134,14 @@
     if (!l) {
       l = document.createElement('div');
       l.id = OVERLAY_ID;
-      l.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483000';
-      document.documentElement.appendChild(l);
+      // Ring sits ABOVE REDCap page content/modals but BELOW Cappy's chat widget
+      // (#chatbot_ui_container, z-index 1000000). Append to document.body — the SAME
+      // stacking context as the chat container — so z-index ordering is deterministic
+      // regardless of whether <body> forms its own stacking context. The container is
+      // transparent + pointer-events:none, so the ring shows through it everywhere
+      // except under the opaque chat box (which correctly paints over the ring).
+      l.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:999999';
+      document.body.appendChild(l);
     }
     return l;
   }

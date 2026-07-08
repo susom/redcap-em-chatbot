@@ -149,9 +149,12 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
             }
 
             foreach ($dir_files as $file) {
-                if (str_contains($file, '.js')) {
+                // Match only actual bundle files — NOT sidecars like *.js.map or
+                // *.js.LICENSE.txt, which str_contains('.js') wrongly caught and
+                // injected as <script type=module>, throwing MIME/parse errors.
+                if (str_ends_with($file, '.js')) {
                     $assets[] = "<script type='module' crossorigin src='{$this->getUrl(self::BUILD_FILE_DIR . '/' . $folder . '/' . $file)}'></script>";
-                } elseif (str_contains($file, '.css')) {
+                } elseif (str_ends_with($file, '.css')) {
                     $assets[] = "<link rel='stylesheet' href='{$this->getUrl(self::BUILD_FILE_DIR . '/' . $folder . '/' . $file)}'>";
                 }
             }

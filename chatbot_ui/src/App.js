@@ -56,29 +56,23 @@ function App() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const exitFullscreen = () => {
-        setIsFullscreen(false);
-        setSize({ width: defaultExpandedWidth, height: defaultExpandedHeight });
-        // Anchor the expanded widget's bottom-right to where the badge's
-        // bottom-right sits (30px margins), so it stays on-screen.
-        setDefaultPosition({
-            x: window.innerWidth  - 30 - defaultExpandedWidth,
-            y: window.innerHeight - 30 - defaultExpandedHeight,
-        });
-        var c = document.getElementById('chatbot_ui_container');
-        if (c) c.classList.remove('cappy-fullscreen');
-    };
-
     const changeView = (viewName) => {
         if (viewName === 'splash') {
-            if (isFullscreen) exitFullscreen();
-            else {
-                // Always snap splash badge to bottom-right corner
-                setDefaultPosition({
-                    x: window.innerWidth  - 30 - 120,
-                    y: window.innerHeight - 30 - 120,
-                });
+            if (isFullscreen) {
+                // Leaving fullscreen straight to the splash badge: clear fullscreen
+                // state/backdrop here. Anchor below is for the 120x120 badge — anchoring
+                // with the EXPANDED widget size (~360x800) left the badge floating near
+                // the top instead of the bottom-right.
+                setIsFullscreen(false);
+                const c = document.getElementById('chatbot_ui_container');
+                if (c) c.classList.remove('cappy-fullscreen');
             }
+            // Always snap the splash badge (120x120) to the bottom-right corner,
+            // whether we came from fullscreen or the expanded widget.
+            setDefaultPosition({
+                x: window.innerWidth  - 30 - 120,
+                y: window.innerHeight - 30 - 120,
+            });
             window.parent.postMessage({ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }, '*');
         } else if (viewName === 'home' || viewName === 'history') {
             const config = window?.cappy_project_config || {};
