@@ -3,6 +3,11 @@ namespace Stanford\REDCapChatBot;
 
 require 'vendor/autoload.php';
 require_once "emLoggerTrait.php";
+// Eagerly require the Cappy hard-scope pretool hook so its bootstrap runs
+// at EM boot. Mirrors REDCapAgentRecordTools/REDCapAgentRecordTools.php:5 —
+// without this, SecureChatAI's class_exists() check at hook-loader time
+// finds nothing and the hook never fires.
+require_once __DIR__ . "/classes/CappyScopePreHook.php";
 use REDCap;
 use Project;
 use Goutte\Client;
@@ -389,7 +394,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                        : (($cast === 'float') ? (float)$value : $value);
         }
     }
-    
+
 
     /**
      * Agent tool endpoint (SecureChatAI calls this directly per tools.json).
@@ -537,7 +542,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 if (!empty($payload['session_id'])) {
                     $override_params['session_id'] = $payload['session_id'];
                 }
-                
+
                 $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid, $user_id);
                 $result = $this->formatResponse($response);
 
