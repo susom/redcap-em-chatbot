@@ -1,18 +1,26 @@
 <?php
 namespace Stanford\REDCapChatBot;
 
-// SecureChatAI may not be loaded yet at EM boot — load its interfaces directly.
-// Use glob so any installed version is found (not just v9.9.9).
-// Mirrors the pattern used by REDCapAgentRecordTools\classes\PhiFieldPreHook.
+// SecureChatAI may not be loaded yet at EM boot — load its interfaces
+// directly. Look in common install locations: modules-local/ (sibling),
+// modules/ (legacy), or anywhere on disk via the EM config registry.
+// Try each candidate; first hit wins.
 if (!interface_exists('Stanford\SecureChatAI\PreToolUseHook')) {
-    $scaDirs = glob(dirname(__DIR__, 2) . '/secure_chat_ai_*/classes');
-    if (!empty($scaDirs)) {
-        $scaClasses = $scaDirs[0];
-        require_once $scaClasses . '/HookInterface.php';
-        require_once $scaClasses . '/HookResult.php';
-        require_once $scaClasses . '/ToolUse.php';
-        require_once $scaClasses . '/ToolContext.php';
-        require_once $scaClasses . '/AbortController.php';
+    $candidates = [];
+    // Sibling modules-local/ (dev/staging layout)
+    foreach (glob(dirname(__DIR__, 2) . '/secure_chat_ai_*/classes') as $d) $candidates[] = $d;
+    // Sibling modules/ (prod layout, may be a symlink)
+    foreach (glob(dirname(__DIR__, 2) . '/../modules/secure_chat_ai_*/classes') as $d) $candidates[] = $d;
+    foreach (glob(dirname(__DIR__, 3) . '/modules/secure_chat_ai_*/classes') as $d) $candidates[] = $d;
+    foreach ($candidates as $scaClasses) {
+        if (is_file($scaClasses . '/HookInterface.php')) {
+            require_once $scaClasses . '/HookInterface.php';
+            require_once $scaClasses . '/HookResult.php';
+            require_once $scaClasses . '/ToolUse.php';
+            require_once $scaClasses . '/ToolContext.php';
+            require_once $scaClasses . '/AbortController.php';
+            break;
+        }
     }
 }
 
