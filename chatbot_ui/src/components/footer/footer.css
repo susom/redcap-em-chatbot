@@ -10,6 +10,14 @@
     padding: 10px;
 }
 
+.footer .cappy-chat-form {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin: 0;
+}
+
 .footer button {
     background: none;
     border: none;

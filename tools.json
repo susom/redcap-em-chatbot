@@ -3,14 +3,15 @@
   "tools": [
     {
       "name": "page.highlight",
-      "description": "Highlight (draw a gold ring around) a field or element on the REDCap page the user is CURRENTLY viewing, to show them where to click or look. Use this whenever the user asks you to point to, show, highlight, or find something on the page. Provide EITHER field (a REDCap field/variable name) OR control_id (from the 'Page elements' list given in context).",
+      "description": "Highlight (draw a gold ring around) a field or element on the REDCap page the user is CURRENTLY viewing, to show them where to click or look. Use this whenever the user asks you to point to, show, highlight, or find something on the page. PREFERRED: pass `text` (a short descriptive phrase naming the control — e.g. 'Twilio SMS and Voice Call services'). The browser will deterministically keyword-match against the live page, so you don't have to pick the right control_id from a list. FALLBACKS: control_id (if you already know it) or field (only for actual REDCap data-entry fields).",
       "action": "page_highlight",
       "parameters": {
         "type": "object",
         "properties": {
-          "field": { "type": "string", "description": "REDCap variable/field name to highlight (for data-entry fields)" },
-          "control_id": { "type": "string", "description": "control_id of a page element (button/link/tab) from the 'Page elements' list in context" },
-          "label": { "type": "string", "description": "Optional human-friendly label to show on the highlight" }
+          "text": { "type": "string", "description": "PREFERRED. A short descriptive phrase naming what to highlight (e.g. 'Twilio SMS', 'MyCap', 'SendGrid', 'Save button'). Browser keyword-matches against the live page." },
+          "field": { "type": "string", "description": "FALLBACK. REDCap variable/field name, only for data-entry fields." },
+          "control_id": { "type": "string", "description": "FALLBACK. control_id from the 'Page elements' list, only if you're sure." },
+          "label": { "type": "string", "description": "Optional human-friendly label to show on the highlight tooltip." }
         }
       },
       "readOnly": true,
