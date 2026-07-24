@@ -470,13 +470,25 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $initial_system_context = $pid_context . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
                 }
 
-                // Display convention: when the user asks for record listings (IDs,
-                // values, sample rows), always render as a GFM markdown table —
-                // pipe-delimited with a header row. Inline tables render cleanly
-                // in this chat UI; a bulleted or numbered list is harder to scan.
-                $initial_system_context = (!empty($initial_system_context) ? $initial_system_context . "\n\n" : '')
-                    . "When you return record IDs, field values, or sample rows, ALWAYS format them as a GitHub-flavored markdown table (| col1 | col2 |, header row, alignment row with ---). Do not use bullet points or comma-separated prose for tabular data."
-                    . (!empty($initial_system_context) ? '' : '');
+                // Display convention + tool usage discipline. These are the
+                // failure modes that keep recurring in the test runs.
+                $table_hint = "TABULAR DATA FORMAT — when returning record IDs, field values, or sample rows:\n"
+                    . "ALWAYS use a GitHub-flavored markdown table. Each row MUST be on its OWN line. Example:\n"
+                    . "```\n"
+                    . "| record_id | name           | mrn         |\n"
+                    . "| ---       | ---           | ---         |\n"
+                    . "| 50        | John Smith    | MRN1000500  |\n"
+                    . "| 51        | Jane Doe      | MRN1000510  |\n"
+                    . "```\n"
+                    . "NEVER put the whole table on a single line. NEVER use bullet points or comma-separated prose for tabular data. If the table is long, paginate with a header every ~20 rows and a one-line note like '(continued)' between sections.\n"
+                    . "\n"
+                    . "TOOL USAGE DISCIPLINE — these failure modes keep recurring. Avoid them:\n"
+                    . "  1. NEVER ask the user for REDCap variable/field names. Call projects.getMetadata(pid=<pid>) to find them yourself, then call records.search with the field names you discovered.\n"
+                    . "  2. NEVER say 'the result is too large to display here' or refuse on size grounds. Large results return a 'reference' parameter that you re-call the same tool with (records.search(pid=70, reference=\"ref_xxxxxxxx\", offset=N, limit=M)) to page through the server-side cache. The cache is in the PHP session and survives the chat lifetime.\n"
+                    . "  3. NEVER say 'I got stuck in a loop' or apologize for the same misunderstanding. If a tool returned data you didn't expect, re-read the tool result and try a different approach. Don't make the user rephrase the same request.\n"
+                    . "  4. If the user gives a hint about which fields to show (e.g. 'AGE, GENDER, RACE'), treat it as a CONCEPT, not a literal REDCap field name. Call projects.getMetadata, find the matching fields (e.g. d_legal_sex, d_race_unc, dob), and use them.\n"
+                    . "  5. When a tool result includes 'reference', PREFER to page through the cache with offset/limit rather than re-running the full query. The reference is an INTERNAL SESSION HANDLE — never mention it in your response to the user. The user should not see strings like 'ref_7001308a' in the chat. Page through the data, render the result, and never echo the reference id back at the user.";
+                $initial_system_context = $table_hint . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
 
                 //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
                 $inject_metadata = !empty($config_pid) ? $this->getProjectSetting('inject-project-metadata', $config_pid) : false;
