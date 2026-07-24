@@ -744,6 +744,19 @@ function scanToText(s) {
               console.log('[Cappy] applied', JSON.stringify(a), '->', JSON.stringify(result));
             }
           });
+          // For large data results (records.search, records.listIds returning
+          // a `reference`), auto-expand the chat widget to full screen so the
+          // inline markdown table the model emits is actually readable.
+          var hasRef = tu.some(function (t) {
+            try {
+              var args = (typeof t.arguments === 'string') ? JSON.parse(t.arguments) : t.arguments;
+              return args && typeof args === 'object' && args.reference;
+            } catch (e) { return false; }
+          });
+          if (hasRef) {
+            try { window.parent.postMessage({ type: 'full-screen' }, '*'); } catch (e) { void e; }
+            console.log('[Cappy] auto-fullscreen: triggered (tool returned reference)');
+          }
         } catch (e) {
           console.error('[Cappy] page-action handling failed:', e);
           void e; /* never break the chat on action handling */

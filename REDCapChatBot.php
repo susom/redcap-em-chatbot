@@ -470,6 +470,14 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $initial_system_context = $pid_context . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
                 }
 
+                // Display convention: when the user asks for record listings (IDs,
+                // values, sample rows), always render as a GFM markdown table —
+                // pipe-delimited with a header row. Inline tables render cleanly
+                // in this chat UI; a bulleted or numbered list is harder to scan.
+                $initial_system_context = (!empty($initial_system_context) ? $initial_system_context . "\n\n" : '')
+                    . "When you return record IDs, field values, or sample rows, ALWAYS format them as a GitHub-flavored markdown table (| col1 | col2 |, header row, alignment row with ---). Do not use bullet points or comma-separated prose for tabular data."
+                    . (!empty($initial_system_context) ? '' : '');
+
                 //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
                 $inject_metadata = !empty($config_pid) ? $this->getProjectSetting('inject-project-metadata', $config_pid) : false;
                 if ($inject_metadata) {
