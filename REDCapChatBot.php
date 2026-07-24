@@ -3,6 +3,18 @@ namespace Stanford\REDCapChatBot;
 
 require 'vendor/autoload.php';
 require_once "emLoggerTrait.php";
+
+// On-demand autoloader so SecureChatAI's hook loader can find our hook class
+// without an eager require_once (which previously crashed the EM-enable path).
+// Triggered the first time any code calls class_exists('Stanford\REDCapChatBot\…').
+spl_autoload_register(function ($class) {
+    $prefix = 'Stanford\\REDCapChatBot\\';
+    if (strncmp($class, $prefix, strlen($prefix)) !== 0) return;
+    $rel = substr($class, strlen($prefix));
+    $file = __DIR__ . '/classes/' . str_replace('\\', '/', $rel) . '.php';
+    if (is_file($file)) require_once $file;
+});
+
 use REDCap;
 use Project;
 use Goutte\Client;
