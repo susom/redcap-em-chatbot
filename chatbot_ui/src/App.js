@@ -12,17 +12,20 @@ import './App.css';
 import './assets/styles/global.css';
 
 function App() {
-    const { greet } = useContext(ChatContext);
+    const { greet, chatContext } = useContext(ChatContext);
     const defaultExpandedWidth  = window?.cappy_project_config?.expanded_width  || 360;
     // Default to 80% of the viewport height (capped at the resize max) when the
     // project hasn't set an explicit expanded_height.
     const defaultExpandedHeight = window?.cappy_project_config?.expanded_height
         || Math.min(Math.floor(window.innerHeight * 0.8), 1000);
 
-    // Restore prior UI state (per-project, idle-expiring). Fullscreen is not
-    // restored — reopen as a normal expanded widget to avoid backdrop races.
+    // Restore prior UI state (per-project, idle-expiring). Fullscreen IS
+    // restored — the user expects the chat to stay in the mode they left it
+    // in (fullscreen → fullscreen, expanded → expanded, splash → splash).
+    // The "backdrop races" issue from before was tied to a different code path;
+    // restoring fullscreen from a clean re-mount works fine.
     const persistedUi = loadUiState();
-    const restoredExpanded = persistedUi && !persistedUi.isFullscreen;
+    const restoredExpanded = !!persistedUi;
 
     const splashPosition = () => ({
         x: window.innerWidth  - 30 - 120,
@@ -33,7 +36,7 @@ function App() {
     const [defaultPosition, setDefaultPosition] = useState(() => (
         restoredExpanded && persistedUi.position ? persistedUi.position : splashPosition()
     ));
-    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(!!(persistedUi?.isFullscreen));
 
     const [size, setSize] = useState(
         restoredExpanded && persistedUi.size
@@ -46,15 +49,62 @@ function App() {
         saveUiState({ view: currentView, position: defaultPosition, size, isFullscreen });
     }, [currentView, defaultPosition, size, isFullscreen]);
 
-    // On mount, sync the host iframe sizing to the restored view
+    // On mount, sync the host iframe sizing to the restored view.
+    // After a session timeout + login, the parent page may not be ready
+    // when the first postMessage fires, so the iframe stays at its previous
+    // (e.g. splash) size and the fullscreen-mode chat appears clipped.
+    // Retrying a few times with a delay reliably wakes the parent up.
     useEffect(() => {
-        if (currentView === 'splash') {
-            window.parent.postMessage({ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }, '*');
-        } else {
-            window.parent.postMessage({ type: 'resize-cappy', source: currentView, width: size.width, height: size.height }, '*');
+        const sendResize = () => {
+            if (currentView === 'splash') {
+                window.parent.postMessage({ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }, '*');
+            } else {
+                window.parent.postMessage({ type: 'resize-cappy', source: currentView, width: size.width, height: size.height }, '*');
+            }
+        };
+        sendResize();
+        const t1 = setTimeout(sendResize, 100);
+        const t2 = setTimeout(sendResize, 400);
+        const t3 = setTimeout(sendResize, 1500);
+        return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // On mount, if we restored to fullscreen mode, apply the fullscreen
+    // size/position (otherwise the widget is sized to expanded dimensions
+    // and doesn't actually fill the screen).
+    useEffect(() => {
+        if (isFullscreen) {
+            const fsWidth  = Math.floor(window.innerWidth  * 0.88);
+            const fsHeight = Math.floor(window.innerHeight * 0.88);
+            const cx = Math.floor((window.innerWidth  - fsWidth)  / 2);
+            const cy = Math.floor((window.innerHeight - fsHeight) / 2);
+            setSize({ width: fsWidth, height: fsHeight });
+            setDefaultPosition({ x: cx, y: cy });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Auto-fullscreen when the assistant renders a markdown table — tabular
+    // data is unreadable in the narrow widget. Idempotent: only ever turns
+    // fullscreen ON, never off (the user can exit manually via the header button).
+    useEffect(() => {
+        if (isFullscreen || currentView === 'splash') return;
+        const last = [...(chatContext || [])].reverse().find(m => m?.assistant_content);
+        if (!last) return;
+        // Markdown table = a separator line of pipes/dashes (| --- | --- |)
+        if (!/^\s*\|[\s:|-]*---[\s:|-]*\|/m.test(last.assistant_content)) return;
+        const fsWidth  = Math.floor(window.innerWidth  * 0.88);
+        const fsHeight = Math.floor(window.innerHeight * 0.88);
+        setSize({ width: fsWidth, height: fsHeight });
+        setDefaultPosition({
+            x: Math.floor((window.innerWidth  - fsWidth)  / 2),
+            y: Math.floor((window.innerHeight - fsHeight) / 2),
+        });
+        setIsFullscreen(true);
+        window.parent.postMessage({ type: 'fullscreen-on' }, '*');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [chatContext]);
 
     const changeView = (viewName) => {
         if (viewName === 'splash') {

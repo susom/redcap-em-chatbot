@@ -754,7 +754,7 @@ function scanToText(s) {
             } catch (e) { return false; }
           });
           if (hasRef) {
-            try { window.parent.postMessage({ type: 'full-screen' }, '*'); } catch (e) { void e; }
+            try { window.parent.postMessage({ type: 'fullscreen-on' }, '*'); } catch (e) { void e; }
             console.log('[Cappy] auto-fullscreen: triggered (tool returned reference)');
           }
         } catch (e) {

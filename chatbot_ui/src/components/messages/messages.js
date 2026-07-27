@@ -1,6 +1,8 @@
 import React, { useContext, useRef, useEffect } from "react";
 import { Overlay, Popover } from 'react-bootstrap';
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import PaginatedTable from "./PaginatedTable";
 import { HandThumbsUp, HandThumbsDown, HandThumbsUpFill, HandThumbsDownFill, XCircleFill, CircleFill } from 'react-bootstrap-icons';
 import { ChatContext } from "../../contexts/Chat";
 import "./messages.css";
@@ -26,6 +28,40 @@ export const Messages = () => {
         formatted = formatted.replace(/^\n+/, '');
 
         return formatted;
+    };
+
+    // Extract paging metadata (cache reference etc.) attached by SecureChatAI
+    // to a records.search tool call — drives the interactive PaginatedTable.
+    const getPaging = (tools_used) => {
+        if (!Array.isArray(tools_used)) return null;
+        for (let i = tools_used.length - 1; i >= 0; i--) {
+            if (tools_used[i]?.paging?.reference) return tools_used[i].paging;
+        }
+        return null;
+    };
+
+    // Split out the first markdown table block (consecutive lines starting
+    // with '|', or a single collapsed line) so it can be REPLACED by the
+    // interactive PaginatedTable — the UI renders the authoritative
+    // server-built preview even if the model mangled its copy.
+    const splitFirstTable = (text) => {
+        if (!text) return null;
+        const lines = text.split('\n');
+        let start = -1, end = -1;
+        for (let i = 0; i < lines.length; i++) {
+            const t = lines[i].trim();
+            if (t.startsWith('|')) {
+                if (start < 0) start = i;
+                end = i;
+            } else if (start >= 0) {
+                break;
+            }
+        }
+        if (start < 0) return null;
+        return {
+            before: lines.slice(0, start).join('\n'),
+            after: lines.slice(end + 1).join('\n'),
+        };
     };
 
     const handleClick = (vote, index) => {
@@ -81,6 +117,15 @@ export const Messages = () => {
                             {message.assistant_content && (() => {
                                 const toolNames = getToolNames(message.tools_used);
                                 const hasEscalationTool = toolNames.some(name => name.startsWith('escalation.'));
+                                const paging = getPaging(message.tools_used);
+                                const split = paging ? splitFirstTable(message.assistant_content) : null;
+                                const mdComponents = {
+                                    a: ({node, children, ...props}) => (
+                                        <a {...props} target="_blank" rel="noopener noreferrer">
+                                            {children}
+                                        </a>
+                                    )
+                                };
                                 return (
                                 <dd
                                     className={`${!message.user_content?.trim() ? 'extratop_margin' : ''} ${hasEscalationTool ? 'has-escalation-tool' : ''}`}
@@ -94,17 +139,33 @@ export const Messages = () => {
                                             ))}
                                         </span>
                                     )}
-                                    <ReactMarkdown
-                                        components={{
-                                            a: ({node, children, ...props}) => (
-                                                <a {...props} target="_blank" rel="noopener noreferrer">
-                                                    {children}
-                                                </a>
-                                            )
-                                        }}
-                                    >
-                                        {formatMarkdown(message.assistant_content)}
-                                    </ReactMarkdown>
+                                    {paging ? (
+                                        <>
+                                            {split?.before?.trim() && (
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                                                    {formatMarkdown(split.before)}
+                                                </ReactMarkdown>
+                                            )}
+                                            {!split && (
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                                                    {formatMarkdown(message.assistant_content)}
+                                                </ReactMarkdown>
+                                            )}
+                                            <PaginatedTable paging={paging} />
+                                            {split?.after?.trim() && (
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                                                    {formatMarkdown(split.after)}
+                                                </ReactMarkdown>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={mdComponents}
+                                        >
+                                            {formatMarkdown(message.assistant_content)}
+                                        </ReactMarkdown>
+                                    )}
                                     {toolNames.length > 0 && (
                                         <div className="tool-usage">
                                             Used tools: {toolNames.join(', ')}

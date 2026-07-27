@@ -142,6 +142,12 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         if (e.data && e.data.type === "full-screen") {
             container.classList.toggle("cappy-fullscreen");
         }
+        if (e.data && e.data.type === "fullscreen-on") {
+            container.classList.add("cappy-fullscreen");
+        }
+        if (e.data && e.data.type === "fullscreen-off") {
+            container.classList.remove("cappy-fullscreen");
+        }
     });
 })();
 </script>';
@@ -441,6 +447,39 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     public function redcap_module_ajax($action, $payload, $project_id=null, $record, $instrument, $event_id, $repeat_instance,
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
         switch ($action) {
+            case "cappyPage":
+                // UI-driven pagination against the server-side session cache.
+                // The LLM returns a reference with its table; the chat UI calls
+                // this directly when the user clicks prev/next — no AI round trip.
+                $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
+                $pid = (int)($payload['pid'] ?? 0);
+                if (empty($config_pid) || $pid !== (int)$config_pid) {
+                    return ["error" => true, "message" => "pid mismatch — can only page within the current project."];
+                }
+                $reference = $payload['reference'] ?? '';
+                if ($reference === '') {
+                    return ["error" => true, "message" => "Missing reference."];
+                }
+                $toolsModule = \ExternalModules\ExternalModules::getModuleInstance('redcap_agent_record_tools');
+                if (!$toolsModule) {
+                    return ["error" => true, "message" => "Record tools module not available."];
+                }
+                $result = $toolsModule->redcap_module_api('records_search', [
+                    'pid' => $pid,
+                    'reference' => $reference,
+                    'offset' => max(0, (int)($payload['offset'] ?? 0)),
+                    'limit' => min(100, max(1, (int)($payload['limit'] ?? 20))),
+                ]);
+                // Only send the UI what it needs — never raw rows.
+                if (!empty($result['error'])) return $result;
+                return [
+                    "preview_markdown" => $result['preview_markdown'] ?? '',
+                    "total" => (int)($result['total_record_count'] ?? 0),
+                    "offset" => (int)($result['offset'] ?? 0),
+                    "limit" => (int)($result['limit'] ?? 20),
+                    "truncated" => !empty($result['truncated']),
+                ];
+
             case "callAI":
                 // If no project context, use the RExI config project for settings
                 $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
@@ -481,6 +520,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     . "| 51        | Jane Doe      | MRN1000510  |\n"
                     . "```\n"
                     . "NEVER put the whole table on a single line. NEVER use bullet points or comma-separated prose for tabular data. If the table is long, paginate with a header every ~20 rows and a one-line note like '(continued)' between sections.\n"
+                    . "ALWAYS SHOW THE DATA — when a records tool returns record data, the user wants to SEE it. When the tool result contains 'preview_markdown', render it VERBATIM as the table in your response (you may add a one-line summary above it like 'Showing 20 of 432'), then offer to show more or filter further. NEVER reply with only a count plus 'which fields would you like to see?' — the preview columns were already chosen sensibly (record_id + filter fields + most-populated fields). If the user later asks for different fields, re-render from the data you already have or page the reference.\n"
                     . "\n"
                     . "TOOL USAGE DISCIPLINE — these failure modes keep recurring. Avoid them:\n"
                     . "  1. NEVER ask the user for REDCap variable/field names. Call projects.getMetadata(pid=<pid>) to find them yourself, then call records.search with the field names you discovered.\n"

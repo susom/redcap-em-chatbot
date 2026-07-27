@@ -61,7 +61,8 @@
     "no-auth-pages": [],
 
     "auth-ajax-actions": [
-        "callAI"
+        "callAI",
+        "cappyPage"
     ],
 
     "no-auth-ajax-actions": [],

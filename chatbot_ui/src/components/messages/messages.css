@@ -174,3 +174,77 @@
 .loading-dl {
     margin-top: -16px;
 }
+
+/* Markdown data tables (records.search previews etc.) */
+.messages dd table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 10px 0;
+    font-size: 0.85em;
+    display: block;
+    overflow-x: auto;
+}
+.messages dd table thead tr {
+    background: #1e3a5f;
+}
+.messages dd table th {
+    color: #fff;
+    font-weight: 600;
+    text-align: left;
+    padding: 6px 10px;
+    border: 1px solid #2d4a6f;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+}
+.messages dd table td {
+    padding: 5px 10px;
+    border: 1px solid #d9dee4;
+    color: #1f2937;
+    white-space: nowrap;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.messages dd table tbody tr:nth-child(even) {
+    background: #f0f4f9;
+}
+.messages dd table tbody tr:hover {
+    background: #dbe7f5;
+}
+
+/* Interactive pagination bar for cached record sets */
+.cappy-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 6px 0 4px;
+    padding: 6px 4px;
+    border-top: 1px solid #d9dee4;
+}
+.cappy-pagination button {
+    background: #1e3a5f;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 14px;
+    font-size: 0.85em;
+    cursor: pointer;
+}
+.cappy-pagination button:hover:not(:disabled) {
+    background: #2d4a6f;
+}
+.cappy-pagination button:disabled {
+    background: #c3ccd6;
+    cursor: default;
+}
+.cappy-pagination-info {
+    font-size: 0.8em;
+    color: #4b5563;
+}
+.cappy-pagination-error {
+    font-size: 0.8em;
+    color: #b91c1c;
+    margin-top: 4px;
+}
