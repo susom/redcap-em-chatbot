@@ -366,6 +366,49 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $json;
     }
 
+    /**
+     * Return a compact `field_name → field_label` index for ALL fields in the
+     * current project. Designed to be cheap enough to inject into every chat
+     * prompt so the agent can resolve natural-language concepts ("severity",
+     * "consented") to the right REDCap field without a tool round-trip.
+     *
+     * Cached on disk with a signature so data-dictionary edits auto-invalidate.
+     * For a 600-field project with ~80-char labels, output is ~50KB (~12K tokens).
+     */
+    public function getFieldIndex(): string
+    {
+        global $Proj;
+
+        if (!$Proj) {
+            return '';
+        }
+
+        $rows = [];
+        foreach ($Proj->metadata as $field) {
+            $name  = $field['field_name']  ?? '';
+            $label = $field['field_label'] ?? ($field['element_label'] ?? '');
+            if ($name === '' || $label === '') continue;
+            $rows[] = $name . "\t" . $label;
+        }
+        if (empty($rows)) {
+            return '';
+        }
+
+        // Signature-based cache: any data-dictionary edit produces a new hash
+        // and a new cache file, so stale context is impossible.
+        $signature = substr(md5(implode("\n", $rows)), 0, 12);
+        $cacheFile = sys_get_temp_dir() . "/redcap_field_index_{$Proj->project_id}_{$signature}.txt";
+        $cacheTtl  = 3600;
+        if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTtl)) {
+            $cached = @file_get_contents($cacheFile);
+            if ($cached !== false && $cached !== '') return $cached;
+        }
+
+        $body = "Field index for project {$Proj->project_id} — name → label:\n" . implode("\n", $rows);
+        @file_put_contents($cacheFile, $body);
+        return $body;
+    }
+
 
     /**
      * Get a project-level or system-level setting, with optional fallback.
@@ -531,7 +574,25 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $initial_system_context = $table_hint . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
 
                 //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
-                $inject_metadata = !empty($config_pid) ? $this->getProjectSetting('inject-project-metadata', $config_pid) : false;
+                // 1. Slim field index (name → label for ALL fields) — default ON.
+                //    Lets the agent disambiguate "severity" → the right field
+                //    without a tool round-trip. Cheap (~3-12K tokens).
+                $inject_index = !empty($config_pid)
+                    ? (bool)$this->getProjectSetting('inject-field-index', $config_pid)
+                    : false;
+                if ($inject_index) {
+                    $field_index = $this->getFieldIndex();
+                    if (!empty($field_index)) {
+                        $messages = $this->appendSystemContext($messages, $field_index);
+                    }
+                }
+
+                // 2. Full form metadata (choices/branching/validation for the
+                //    CURRENT form only) — opt-in, expensive on forms with long
+                //    choice lists. Off by default.
+                $inject_metadata = !empty($config_pid)
+                    ? (bool)$this->getProjectSetting('inject-full-form-metadata', $config_pid)
+                    : false;
                 if ($inject_metadata) {
                     $current_project_context = $this->getREDCapProjectContext($instrument);
                     if (!empty($current_project_context)) {

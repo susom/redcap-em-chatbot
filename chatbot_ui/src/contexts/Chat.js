@@ -1,17 +1,19 @@
 import React, { createContext, useState, useRef, useEffect } from 'react';
-import { saveNewSession, updateSession, getSession } from '../components/database/dexie';
-import { loadUiState, saveUiState } from '../components/utils/persistence';
+import { loadUiState, saveUiState, loadChatSession, saveChatSession } from '../components/utils/persistence';
 
 export const ChatContext = createContext();
 
 export const ChatContextProvider = ({ children , projectContextRef}) => {
     const persistedUi = loadUiState();
+    const persistedSession = loadChatSession();
     const [apiContext, setApiContext] = useState([]);
-    const [chatContext, setChatContext] = useState([]);
+    const [chatContext, setChatContext] = useState(persistedSession?.messages || []);
     const [showRatingPO, setShowRatingPO] = useState(false);
-    const [sessionId, setSessionId] = useState(persistedUi?.sessionId || Date.now().toString());
-    const [messages, setMessages] = useState([]);
-    const [msgCount, setMsgCount] = useState(0);
+    const [sessionId, setSessionId] = useState(
+        persistedSession?.sessionId || persistedUi?.sessionId || Date.now().toString()
+    );
+    const [messages, setMessages] = useState(persistedSession?.messages || []);
+    const [msgCount, setMsgCount] = useState(persistedSession?.messages?.length || 0);
     const [errorMessage, setErrorMessage] = useState(null);
     const [loading, setLoading] = useState(false);
 
@@ -75,16 +77,15 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Restore the active session from Dexie on mount (per-project, idle-expiring).
-    // Rebuilds apiContext from saved turns so the conversation can continue.
+    // Restore the active chat from sessionStorage on mount (per-tab, per-project).
+    // Rebuilds apiContext from saved turns so the conversation continues across
+    // page navigations within the same tab.
     useEffect(() => {
         const restoreSession = async () => {
-            const ui = loadUiState();
-            if (!ui?.sessionId) return;
-            const session = await getSession(ui.sessionId);
-            if (!session || !Array.isArray(session.queries) || session.queries.length === 0) return;
+            const persisted = loadChatSession();
+            if (!persisted?.sessionId || !Array.isArray(persisted.messages) || persisted.messages.length === 0) return;
 
-            const queries = session.queries;
+            const queries = persisted.messages;
             chatContextRef.current = queries;
             setChatContext(queries);
             setMessages(queries);
@@ -116,10 +117,19 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Persist the active session id (and refresh the idle timer)
+    // Persist the active chat to sessionStorage on every change. sessionStorage
+    // survives page reloads within the same tab — so navigating between REDCap
+    // pages keeps the conversation alive. Dies on tab close (no archives).
+    // Debounced because chatContext can update many times per second during
+    // streaming responses; sessionStorage is synchronous and would block UI.
     useEffect(() => {
-        saveUiState({ sessionId });
-    }, [sessionId]);
+        if (!sessionId || chatContext.length === 0) return;
+        const timer = setTimeout(() => {
+            saveChatSession({ sessionId, messages: chatContext });
+        }, 250);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessionId, chatContext]);
 
     const updateApiContext = (newContext) => {
         apiContextRef.current = newContext;
@@ -128,13 +138,15 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
     const saveChatContext = async () => {
         if (sessionId && chatContextRef.current.length > 0) {
-            saveUiState({ sessionId }); // refresh idle timer on activity
-            const currentSession = await getSession(sessionId);
-            if (currentSession) {
-                await updateSession(sessionId, chatContextRef.current);
-            } else {
-                await saveNewSession(sessionId, Date.now(), chatContextRef.current);
-            }
+            // DISABLED: chat history persistence turned off.
+            // Re-enable both saves when the archive icon is back.
+            // saveUiState({ sessionId }); // refresh idle timer on activity
+            // const currentSession = await getSession(sessionId);
+            // if (currentSession) {
+            //     await updateSession(sessionId, chatContextRef.current);
+            // } else {
+            //     await saveNewSession(sessionId, Date.now(), chatContextRef.current);
+            // }
         }
     };
 

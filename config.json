@@ -141,8 +141,15 @@
             "type": "textarea"
         },
         {
-            "key": "inject-project-metadata",
-            "name": "<b>Inject Project Metadata into System Prompt</b><br><i>(optional)</i> Adds full REDCap project metadata to the prompt. Can be large — useful for debugging or development.",
+            "key": "inject-field-index",
+            "name": "<b>Inject Field Index into System Prompt</b><br><i>(recommended, default ON)</i> Adds a compact <code>field_name → field_label</code> index for every field in the project. Lets Cappy resolve \"severity\" → the right field without an extra tool call. Typically a few KB even on 800+ field projects.",
+            "required": false,
+            "type": "checkbox",
+            "default": true
+        },
+        {
+            "key": "inject-full-form-metadata",
+            "name": "<b>Inject Full Form Metadata</b><br><i>(optional, opt-in)</i> When ON and the user is on a record page, injects the current form's fields with choices, branching logic, and validation types. Off-instrument queries still get the slim index. Can bloat the prompt on forms with long choice lists — leave OFF unless Cappy struggles with disambiguation.",
             "required": false,
             "type": "checkbox"
         },
@@ -183,10 +190,6 @@
                 {
                     "value": "claude-opus-4-7",
                     "name": "Claude Opus 4.7"
-                },
-                {
-                    "value": "deepseek-r1",
-                    "name": "DeepSeek R1"
                 },
                 {
                     "value": "gemini-2.5-flash",
@@ -313,10 +316,6 @@
                 {
                     "value": "claude-opus-4-7",
                     "name": "Claude Opus 4.7"
-                },
-                {
-                    "value": "deepseek-r1",
-                    "name": "DeepSeek R1"
                 },
                 {
                     "value": "gemini-2.5-flash",

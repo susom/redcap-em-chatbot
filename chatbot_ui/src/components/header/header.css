@@ -34,6 +34,19 @@
     margin-left: 0;
 }
 
+/* Disabled archive icon — coming soon */
+.rcchat_header button.archive:disabled,
+.rcchat_header button.archive[aria-disabled="true"] {
+    color: rgba(255, 255, 255, 0.35);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+.rcchat_header button.archive:disabled:hover,
+.rcchat_header button.archive[aria-disabled="true"]:hover {
+    color: rgba(255, 255, 255, 0.35);
+    background: none;
+}
+
 .rcchat_header .fullscreen{
     margin-left: 0;
 } 
