@@ -1,5 +1,5 @@
 import React, { createContext, useState, useRef, useEffect } from 'react';
-import { loadUiState, saveUiState, loadChatSession, saveChatSession } from '../components/utils/persistence';
+import { loadUiState, saveUiState, loadChatSession, saveChatSession, clearChatSession } from '../components/utils/persistence';
 
 export const ChatContext = createContext();
 
@@ -318,6 +318,10 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         setMessages([]);
         setSessionId(newSessionId);
         hasGreeted.current = false;
+
+        // Drop the sessionStorage copy too — otherwise a page reload resurrects
+        // the conversation the user just cleared.
+        clearChatSession();
 
         // Filter apiContext to keep only "system" roles
         const filteredApiContext = apiContextRef.current.filter(entry => entry.role === "system");
