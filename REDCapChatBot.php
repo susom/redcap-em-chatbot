@@ -3,6 +3,18 @@ namespace Stanford\REDCapChatBot;
 
 require 'vendor/autoload.php';
 require_once "emLoggerTrait.php";
+
+// On-demand autoloader so SecureChatAI's hook loader can find our hook class
+// without an eager require_once (which previously crashed the EM-enable path).
+// Triggered the first time any code calls class_exists('Stanford\REDCapChatBot\…').
+spl_autoload_register(function ($class) {
+    $prefix = 'Stanford\\REDCapChatBot\\';
+    if (strncmp($class, $prefix, strlen($prefix)) !== 0) return;
+    $rel = substr($class, strlen($prefix));
+    $file = __DIR__ . '/classes/' . str_replace('\\', '/', $rel) . '.php';
+    if (is_file($file)) require_once $file;
+});
+
 use REDCap;
 use Project;
 use Goutte\Client;
@@ -129,6 +141,12 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         if (!container) return;
         if (e.data && e.data.type === "full-screen") {
             container.classList.toggle("cappy-fullscreen");
+        }
+        if (e.data && e.data.type === "fullscreen-on") {
+            container.classList.add("cappy-fullscreen");
+        }
+        if (e.data && e.data.type === "fullscreen-off") {
+            container.classList.remove("cappy-fullscreen");
         }
     });
 })();
@@ -348,6 +366,49 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $json;
     }
 
+    /**
+     * Return a compact `field_name → field_label` index for ALL fields in the
+     * current project. Designed to be cheap enough to inject into every chat
+     * prompt so the agent can resolve natural-language concepts ("severity",
+     * "consented") to the right REDCap field without a tool round-trip.
+     *
+     * Cached on disk with a signature so data-dictionary edits auto-invalidate.
+     * For a 600-field project with ~80-char labels, output is ~50KB (~12K tokens).
+     */
+    public function getFieldIndex(): string
+    {
+        global $Proj;
+
+        if (!$Proj) {
+            return '';
+        }
+
+        $rows = [];
+        foreach ($Proj->metadata as $field) {
+            $name  = $field['field_name']  ?? '';
+            $label = $field['field_label'] ?? ($field['element_label'] ?? '');
+            if ($name === '' || $label === '') continue;
+            $rows[] = $name . "\t" . $label;
+        }
+        if (empty($rows)) {
+            return '';
+        }
+
+        // Signature-based cache: any data-dictionary edit produces a new hash
+        // and a new cache file, so stale context is impossible.
+        $signature = substr(md5(implode("\n", $rows)), 0, 12);
+        $cacheFile = sys_get_temp_dir() . "/redcap_field_index_{$Proj->project_id}_{$signature}.txt";
+        $cacheTtl  = 3600;
+        if (file_exists($cacheFile) && (time() - filemtime($cacheFile) < $cacheTtl)) {
+            $cached = @file_get_contents($cacheFile);
+            if ($cached !== false && $cached !== '') return $cached;
+        }
+
+        $body = "Field index for project {$Proj->project_id} — name → label:\n" . implode("\n", $rows);
+        @file_put_contents($cacheFile, $body);
+        return $body;
+    }
+
 
     /**
      * Get a project-level or system-level setting, with optional fallback.
@@ -429,9 +490,42 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     public function redcap_module_ajax($action, $payload, $project_id=null, $record, $instrument, $event_id, $repeat_instance,
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
         switch ($action) {
+            case "cappyPage":
+                // UI-driven pagination against the server-side session cache.
+                // The LLM returns a reference with its table; the chat UI calls
+                // this directly when the user clicks prev/next — no AI round trip.
+                $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
+                $pid = (int)($payload['pid'] ?? 0);
+                if (empty($config_pid) || $pid !== (int)$config_pid) {
+                    return ["error" => true, "message" => "pid mismatch — can only page within the current project."];
+                }
+                $reference = $payload['reference'] ?? '';
+                if ($reference === '') {
+                    return ["error" => true, "message" => "Missing reference."];
+                }
+                $toolsModule = \ExternalModules\ExternalModules::getModuleInstance('redcap_agent_record_tools');
+                if (!$toolsModule) {
+                    return ["error" => true, "message" => "Record tools module not available."];
+                }
+                $result = $toolsModule->redcap_module_api('records_search', [
+                    'pid' => $pid,
+                    'reference' => $reference,
+                    'offset' => max(0, (int)($payload['offset'] ?? 0)),
+                    'limit' => min(100, max(1, (int)($payload['limit'] ?? 20))),
+                ]);
+                // Only send the UI what it needs — never raw rows.
+                if (!empty($result['error'])) return $result;
+                return [
+                    "preview_markdown" => $result['preview_markdown'] ?? '',
+                    "total" => (int)($result['total_record_count'] ?? 0),
+                    "offset" => (int)($result['offset'] ?? 0),
+                    "limit" => (int)($result['limit'] ?? 20),
+                    "truncated" => !empty($result['truncated']),
+                ];
+
             case "callAI":
                 // If no project context, use the RExI config project for settings
-                $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
+                $config_pid = $project_id;
 
                 // Extract messages and session_id from payload (new structure: {messages: [], session_id: string})
                 $messages = isset($payload['messages']) ? $this->sanitizeInput($payload['messages']) : $this->sanitizeInput($payload);
@@ -458,8 +552,47 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $initial_system_context = $pid_context . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
                 }
 
+                // Display convention + tool usage discipline. These are the
+                // failure modes that keep recurring in the test runs.
+                $table_hint = "TABULAR DATA FORMAT — when returning record IDs, field values, or sample rows:\n"
+                    . "ALWAYS use a GitHub-flavored markdown table. Each row MUST be on its OWN line. Example:\n"
+                    . "```\n"
+                    . "| record_id | name           | mrn         |\n"
+                    . "| ---       | ---           | ---         |\n"
+                    . "| 50        | John Smith    | MRN1000500  |\n"
+                    . "| 51        | Jane Doe      | MRN1000510  |\n"
+                    . "```\n"
+                    . "NEVER put the whole table on a single line. NEVER use bullet points or comma-separated prose for tabular data. If the table is long, paginate with a header every ~20 rows and a one-line note like '(continued)' between sections.\n"
+                    . "ALWAYS SHOW THE DATA — when a records tool returns record data, the user wants to SEE it. When the tool result contains 'preview_markdown', render it VERBATIM as the table in your response (you may add a one-line summary above it like 'Showing 20 of 432'), then offer to show more or filter further. NEVER reply with only a count plus 'which fields would you like to see?' — the preview columns were already chosen sensibly (record_id + filter fields + most-populated fields). If the user later asks for different fields, re-render from the data you already have or page the reference.\n"
+                    . "\n"
+                    . "TOOL USAGE DISCIPLINE — these failure modes keep recurring. Avoid them:\n"
+                    . "  1. NEVER ask the user for REDCap variable/field names. Call projects.getMetadata(pid=<pid>) to find them yourself, then call records.search with the field names you discovered.\n"
+                    . "  2. NEVER say 'the result is too large to display here' or refuse on size grounds. Large results return a 'reference' parameter that you re-call the same tool with (records.search(pid=70, reference=\"ref_xxxxxxxx\", offset=N, limit=M)) to page through the server-side cache. The cache is in the PHP session and survives the chat lifetime.\n"
+                    . "  3. NEVER say 'I got stuck in a loop' or apologize for the same misunderstanding. If a tool returned data you didn't expect, re-read the tool result and try a different approach. Don't make the user rephrase the same request.\n"
+                    . "  4. If the user gives a hint about which fields to show (e.g. 'AGE, GENDER, RACE'), treat it as a CONCEPT, not a literal REDCap field name. Call projects.getMetadata, find the matching fields (e.g. d_legal_sex, d_race_unc, dob), and use them.\n"
+                    . "  5. When a tool result includes 'reference', PREFER to page through the cache with offset/limit rather than re-running the full query. The reference is an INTERNAL SESSION HANDLE — never mention it in your response to the user. The user should not see strings like 'ref_7001308a' in the chat. Page through the data, render the result, and never echo the reference id back at the user.";
+                $initial_system_context = $table_hint . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
+
                 //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
-                $inject_metadata = !empty($config_pid) ? $this->getProjectSetting('inject-project-metadata', $config_pid) : false;
+                // 1. Slim field index (name → label for ALL fields) — default ON.
+                //    Lets the agent disambiguate "severity" → the right field
+                //    without a tool round-trip. Cheap (~3-12K tokens).
+                $inject_index = !empty($config_pid)
+                    ? (bool)$this->getProjectSetting('inject-field-index', $config_pid)
+                    : false;
+                if ($inject_index) {
+                    $field_index = $this->getFieldIndex();
+                    if (!empty($field_index)) {
+                        $messages = $this->appendSystemContext($messages, $field_index);
+                    }
+                }
+
+                // 2. Full form metadata (choices/branching/validation for the
+                //    CURRENT form only) — opt-in, expensive on forms with long
+                //    choice lists. Off by default.
+                $inject_metadata = !empty($config_pid)
+                    ? (bool)$this->getProjectSetting('inject-full-form-metadata', $config_pid)
+                    : false;
                 if ($inject_metadata) {
                     $current_project_context = $this->getREDCapProjectContext($instrument);
                     if (!empty($current_project_context)) {
@@ -506,14 +639,14 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $messages = $this->appendSystemContext($messages, $initial_system_context);
                 }
 
+                // PHI-safe: log metadata only — never message content.
                 $this->emDebug("Full message context with RAG", [
                     'message_count' => count($messages),
                     'has_rag' => !empty($ragContext),
-                    'messages_preview' => array_map(function($msg) {
+                    'messages_meta' => array_map(function($msg) {
                         return [
                             'role' => $msg['role'],
                             'content_length' => strlen($msg['content'] ?? ''),
-                            'content_preview' => substr($msg['content'] ?? '', 0, 200)
                         ];
                     }, $messages)
                 ]);
@@ -541,7 +674,14 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid, $user_id);
                 $result = $this->formatResponse($response);
 
-                $this->emDebug("calling SecureChatAI.callAI()", $result);
+                // PHI-safe: log response shape only, not the content.
+                $this->emDebug("calling SecureChatAI.callAI()", [
+                    'response_keys' => array_keys($result ?? []),
+                    'has_tools_used' => !empty($result['tools_used']),
+                    'tools_used_count' => count($result['tools_used'] ?? []),
+                    'model' => $result['model'] ?? null,
+                    'usage' => $result['usage'] ?? null,
+                ]);
 
                 // Debug response size and RAG context to identify WAF triggers
                 $json_result = json_encode($result);

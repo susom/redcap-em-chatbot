@@ -25,7 +25,12 @@ function Header({ changeView }) {
                 <button onClick={toggleFullscreen} className="fullscreen">
                     <BorderBottom size={16} />
                 </button>
-                <button onClick={() => changeView('history')} className="archive">
+                <button
+                    className="archive"
+                    disabled
+                    aria-disabled="true"
+                    title="Chat history — coming soon"
+                >
                     <Archive size={16}/>
                 </button>
                 <button onClick={() => changeView('home')} className="chat">
