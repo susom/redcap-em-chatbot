@@ -56,8 +56,8 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                     .slice(lastExportedRef.current)
                     .filter(m => m.role === 'user' || m.role === 'assistant');
                 
+                // PHI-safe: log counts only, never message content.
                 console.log('[CAPPY-DELTA-EXPORT] Exporting session delta:', {
-                    messages: delta,
                     messageCount: delta.length,
                     totalContextLength: apiContextRef.current.length,
                     lastExportedIndex: lastExportedRef.current
@@ -390,7 +390,11 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                     updateApiContext(contextToSend);
                 }
 
-                console.log("calling callAI with ", contextToSend);
+                // PHI-safe: log message count and roles only — never content.
+                console.log("calling callAI with", {
+                    message_count: contextToSend.length,
+                    roles: contextToSend.map(m => m.role),
+                });
 
                 if (!window.chatbot_jsmo_module || typeof window.chatbot_jsmo_module.callAI !== 'function') {
                     throw new Error("chatbot_jsmo_module.callAI is unavailable");

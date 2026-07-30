@@ -525,7 +525,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
             case "callAI":
                 // If no project context, use the RExI config project for settings
-                $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
+                $config_pid = $project_id;
 
                 // Extract messages and session_id from payload (new structure: {messages: [], session_id: string})
                 $messages = isset($payload['messages']) ? $this->sanitizeInput($payload['messages']) : $this->sanitizeInput($payload);
@@ -639,14 +639,14 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $messages = $this->appendSystemContext($messages, $initial_system_context);
                 }
 
+                // PHI-safe: log metadata only — never message content.
                 $this->emDebug("Full message context with RAG", [
                     'message_count' => count($messages),
                     'has_rag' => !empty($ragContext),
-                    'messages_preview' => array_map(function($msg) {
+                    'messages_meta' => array_map(function($msg) {
                         return [
                             'role' => $msg['role'],
                             'content_length' => strlen($msg['content'] ?? ''),
-                            'content_preview' => substr($msg['content'] ?? '', 0, 200)
                         ];
                     }, $messages)
                 ]);
@@ -674,7 +674,14 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid, $user_id);
                 $result = $this->formatResponse($response);
 
-                $this->emDebug("calling SecureChatAI.callAI()", $result);
+                // PHI-safe: log response shape only, not the content.
+                $this->emDebug("calling SecureChatAI.callAI()", [
+                    'response_keys' => array_keys($result ?? []),
+                    'has_tools_used' => !empty($result['tools_used']),
+                    'tools_used_count' => count($result['tools_used'] ?? []),
+                    'model' => $result['model'] ?? null,
+                    'usage' => $result['usage'] ?? null,
+                ]);
 
                 // Debug response size and RAG context to identify WAF triggers
                 $json_result = json_encode($result);
