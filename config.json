@@ -62,7 +62,8 @@
 
     "auth-ajax-actions": [
         "callAI",
-        "cappyPage"
+        "cappyPage",
+        "rebuildSession"
     ],
 
     "no-auth-ajax-actions": [],

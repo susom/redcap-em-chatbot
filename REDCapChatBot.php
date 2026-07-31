@@ -230,6 +230,40 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         return $formattedResponse;
     }
 
+    /**
+     * Unwrap an agent-mode JSON envelope ({final_answer|tool_call|thinking})
+     * that may have been persisted to the audit log verbatim when the model
+     * was on a non-schema adapter (e.g. Claude served through the OpenAI
+     * fallback path) and the inner JSON schema response leaked through.
+     * Mirrors Chat.js::unwrapAgentEnvelope so server and client agree.
+     *
+     * @param string $content Raw assistant content from the log
+     * @return string Plain text final answer, or the original string if not an envelope
+     */
+    private function unwrapAgentEnvelope($content)
+    {
+        if (!is_string($content)) return $content;
+        $trimmed = trim($content);
+        if ($trimmed === '' || $trimmed[0] !== '{') return $content;
+        // Strip markdown code fences just in case.
+        $cleaned = trim(preg_replace('/^```json\s*|\s*```$/s', '', $trimmed));
+        $decoded = json_decode($cleaned, true);
+        if (!is_array($decoded)) return $content;
+        if (isset($decoded['final_answer']) && is_string($decoded['final_answer'])) {
+            return $decoded['final_answer'];
+        }
+        if (isset($decoded['content']) && is_string($decoded['content'])) {
+            return $decoded['content'];
+        }
+        if (isset($decoded['message']) && is_string($decoded['message'])) {
+            return $decoded['message'];
+        }
+        if (isset($decoded['tool_call'])) {
+            return "I apologize, but I wasn't able to complete that request properly. Could you try rephrasing?";
+        }
+        return $content;
+    }
+
     public function appendSystemContext($chatMlArray, $newContext) {
         $hasSystemContext = false;
         for ($i = 0; $i < count($chatMlArray); $i++) {
@@ -521,6 +555,71 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     "offset" => (int)($result['offset'] ?? 0),
                     "limit" => (int)($result['limit'] ?? 20),
                     "truncated" => !empty($result['truncated']),
+                ];
+
+            case "rebuildSession":
+                // Reconstruct a chat session from server-side logs by session_id.
+                // The client only persists sessionId in sessionStorage (no message
+                // content) — on page navigation it pings this endpoint to pull
+                // the conversation back out of redcap_external_modules_log via
+                // SecureChatAI::rehydrateProjectSession.
+                $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
+                $pid = (int)($payload['pid'] ?? 0);
+                if (empty($config_pid) || $pid !== (int)$config_pid) {
+                    return ["error" => true, "message" => "pid mismatch — can only rebuild within the current project."];
+                }
+                $session_id = (string)($payload['session_id'] ?? '');
+                if ($session_id === '') {
+                    return ["error" => true, "message" => "Missing session_id."];
+                }
+                // Reject anything that doesn't look like our client-generated session_id
+                // (Date.now().toString() — digits only, up to ~16 chars). Defense-in-depth
+                // so the SQL LIKE fallback can't be tricked by weird characters.
+                if (!preg_match('/^\d{1,20}$/', $session_id)) {
+                    return ["error" => true, "message" => "Invalid session_id."];
+                }
+                $scModule = \ExternalModules\ExternalModules::getModuleInstance('secure_chat_ai');
+                if (!$scModule || !method_exists($scModule, 'rehydrateProjectSession')) {
+                    return ["error" => true, "message" => "SecureChatAI module not available."];
+                }
+                $rehydrated = $scModule->rehydrateProjectSession($session_id, $pid);
+                $raw_messages = is_array($rehydrated['messages'] ?? null) ? $rehydrated['messages'] : [];
+
+                // Adapt backend's {role, content, turn, tools_used} shape into
+                // the UI's {user_content, assistant_content, timestamp, meta, tools_used}
+                // shape so the existing restore loop in Chat.js works unchanged.
+                // Also unwrap any agent-mode JSON envelope ({final_answer|tool_call})
+                // that may have been persisted to the audit log verbatim.
+                $turns = [];
+                foreach ($raw_messages as $idx => $m) {
+                    $role = $m['role'] ?? null;
+                    $content = $m['content'] ?? '';
+                    if ($role === 'assistant' && is_string($content) && $content !== '') {
+                        $content = $this->unwrapAgentEnvelope($content);
+                    }
+                    if ($role === 'user') {
+                        $turns[] = [
+                            'user_content' => $content,
+                            'assistant_content' => null,
+                            'timestamp' => is_numeric($m['turn'] ?? null) ? (int)$m['turn'] : ($idx + 1),
+                            'meta' => null,
+                            'tools_used' => null,
+                        ];
+                    } elseif ($role === 'assistant') {
+                        $turns[] = [
+                            'user_content' => null,
+                            'assistant_content' => $content,
+                            'timestamp' => is_numeric($m['turn'] ?? null) ? (int)$m['turn'] : ($idx + 1),
+                            'meta' => null,
+                            'tools_used' => !empty($m['tools_used']) ? $m['tools_used'] : null,
+                        ];
+                    }
+                }
+
+                return [
+                    'session_id' => $session_id,
+                    'messages' => $turns,
+                    'total' => count($turns),
                 ];
 
             case "callAI":

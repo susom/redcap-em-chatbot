@@ -40,15 +40,12 @@
     cursor: move; /* Indicate draggable area */
 }
 
+/* Fullscreen marker — the chat widget itself (inside .draggable-container)
+   sizes itself to ~88% of the viewport via React state. The outer container
+   stays pointer-events: none and has no backdrop, so the REDCap page behind
+   remains visible and clickable in every view (splash, expanded, fullscreen). */
 #chatbot_ui_container.cappy-fullscreen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw !important;
-    height: 100vh !important;
     z-index: 1000001;
-    pointer-events: auto;
-    background: rgba(0,0,0,0.5);
 }
 
 

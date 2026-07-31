@@ -7,13 +7,13 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     const persistedUi = loadUiState();
     const persistedSession = loadChatSession();
     const [apiContext, setApiContext] = useState([]);
-    const [chatContext, setChatContext] = useState(persistedSession?.messages || []);
+    const [chatContext, setChatContext] = useState([]);
     const [showRatingPO, setShowRatingPO] = useState(false);
     const [sessionId, setSessionId] = useState(
         persistedSession?.sessionId || persistedUi?.sessionId || Date.now().toString()
     );
-    const [messages, setMessages] = useState(persistedSession?.messages || []);
-    const [msgCount, setMsgCount] = useState(persistedSession?.messages?.length || 0);
+    const [messages, setMessages] = useState([]);
+    const [msgCount, setMsgCount] = useState(0);
     const [errorMessage, setErrorMessage] = useState(null);
     const [loading, setLoading] = useState(false);
 
@@ -24,6 +24,33 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     const CONVERSATION_SUMMARY_LABEL = "Previous Conversation Summary";
     const injectedUsername = useRef(false);
     const hasGreeted = useRef(false);
+
+    // Defensive: if the assistant content somehow arrives as an agent-mode
+    // JSON envelope ({"final_answer":"..."} or {"tool_call":{...}}), unwrap
+    // it before we store/display it. Normally SecureChatAI's sanitizeOutputForUI
+    // handles this server-side; this is a backstop for any path that leaks
+    // the raw JSON (e.g. older builds, replayed history, fallback models).
+    const unwrapAgentEnvelope = (content) => {
+        if (typeof content !== 'string') return content;
+        const trimmed = content.trim();
+        if (!trimmed.startsWith('{')) return content;
+        // Strip code fences just in case.
+        const cleaned = trimmed.replace(/^```json\s*|\s*```$/g, '').trim();
+        try {
+            const obj = JSON.parse(cleaned);
+            if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+                if (typeof obj.final_answer === 'string') return obj.final_answer;
+                if (typeof obj.content === 'string') return obj.content;
+                if (typeof obj.message === 'string') return obj.message;
+                if (obj.tool_call) {
+                    return "I apologize, but I wasn't able to complete that request properly. Could you try rephrasing?";
+                }
+            }
+        } catch (e) {
+            // Not JSON — leave alone.
+        }
+        return content;
+    };
 
     // Context compression settings
     const COMPRESSION_THRESHOLD = 20; // Trigger compression after 20 messages
@@ -77,59 +104,102 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Restore the active chat from sessionStorage on mount (per-tab, per-project).
-    // Rebuilds apiContext from saved turns so the conversation continues across
-    // page navigations within the same tab.
+    // Restore the active chat on mount by pulling history from the server
+    // using just the sessionId persisted in sessionStorage. The actual
+    // conversation lives in redcap_external_modules_log (via SecureChatAI),
+    // so we never store message content client-side. If the server has no
+    // record of the session (e.g. cleared logs, different tab, server
+    // restart), the sessionStorage flag is dropped and the user sees a
+    // fresh chat.
     useEffect(() => {
         const restoreSession = async () => {
             const persisted = loadChatSession();
-            if (!persisted?.sessionId || !Array.isArray(persisted.messages) || persisted.messages.length === 0) return;
+            if (!persisted?.sessionId) return;
 
-            const queries = persisted.messages;
-            chatContextRef.current = queries;
-            setChatContext(queries);
-            setMessages(queries);
-            setMsgCount(queries.length);
+            const sid = persisted.sessionId;
+            const pid = window.cappy_project_config?.pid;
+            if (!pid) {
+                // No project context — can't scope the lookup; give up.
+                clearChatSession();
+                return;
+            }
 
-            // Rebuild apiContext (ChatML) from saved display turns
-            const rebuilt = [];
-            queries.forEach((q, i) => {
-                if (q.user_content) {
-                    rebuilt.push({ role: 'user', content: q.user_content, index: i, meta: q.meta ?? undefined });
-                }
-                if (q.assistant_content) {
-                    rebuilt.push({ role: 'assistant', content: q.assistant_content, index: i });
-                }
-            });
-            apiContextRef.current = rebuilt;
-            setApiContext(rebuilt);
+            const applyTurns = (queries) => {
+                chatContextRef.current = queries;
+                setChatContext(queries);
+                setMessages(queries);
+                setMsgCount(queries.length);
 
-            // Don't re-inject the username greeting if it's already in history
-            const hasUsername = queries.some(
-                q => q.meta?.internal && typeof q.user_content === 'string' && q.user_content.startsWith('My name is')
-            );
-            if (hasUsername) injectedUsername.current = true;
+                const rebuilt = [];
+                queries.forEach((q, i) => {
+                    if (q.user_content) {
+                        rebuilt.push({ role: 'user', content: unwrapAgentEnvelope(q.user_content), index: i, meta: q.meta ?? undefined });
+                    }
+                    if (q.assistant_content) {
+                        rebuilt.push({ role: 'assistant', content: unwrapAgentEnvelope(q.assistant_content), index: i });
+                    }
+                });
+                apiContextRef.current = rebuilt;
+                setApiContext(rebuilt);
 
-            // Delta export pointer starts at the end of restored history
-            lastExportedRef.current = rebuilt.length;
+                const hasUsername = queries.some(
+                    q => q.meta?.internal && typeof q.user_content === 'string' && q.user_content.startsWith('My name is')
+                );
+                if (hasUsername) injectedUsername.current = true;
+
+                lastExportedRef.current = rebuilt.length;
+            };
+
+            if (!window.chatbot_jsmo_module?.rebuildSession) {
+                // JSMO not ready yet — bail; the sessionId is preserved for next mount.
+                return;
+            }
+
+            try {
+                await new Promise((resolve) => {
+                    window.chatbot_jsmo_module.rebuildSession(
+                        { session_id: sid, pid },
+                        (res) => {
+                            if (res?.error) {
+                                // Backend says no — drop the stale flag, start fresh.
+                                clearChatSession();
+                                resolve();
+                                return;
+                            }
+                            const queries = Array.isArray(res?.messages) ? res.messages : [];
+                            if (queries.length === 0) {
+                                clearChatSession();
+                                resolve();
+                                return;
+                            }
+                            applyTurns(queries);
+                            resolve();
+                        },
+                        (err) => {
+                            console.warn('[Cappy] rebuildSession failed:', err);
+                            // Don't drop the flag on transport error — page reload can retry.
+                            resolve();
+                        }
+                    );
+                });
+            } catch (e) {
+                console.warn('[Cappy] rebuildSession exception:', e);
+            }
         };
         restoreSession();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Persist the active chat to sessionStorage on every change. sessionStorage
-    // survives page reloads within the same tab — so navigating between REDCap
-    // pages keeps the conversation alive. Dies on tab close (no archives).
-    // Debounced because chatContext can update many times per second during
-    // streaming responses; sessionStorage is synchronous and would block UI.
+    // Mirror sessionId → sessionStorage so a page reload can find the
+    // session again via rebuildSession. Only the id is persisted — never
+    // any message content. clearMessages() calls clearChatSession()
+    // separately before this fires, so its sequence works as:
+    //   clearChatSession() → setSessionId(newId) → this effect saves newId.
     useEffect(() => {
-        if (!sessionId || chatContext.length === 0) return;
-        const timer = setTimeout(() => {
-            saveChatSession({ sessionId, messages: chatContext });
-        }, 250);
-        return () => clearTimeout(timer);
+        if (!sessionId) return;
+        saveChatSession({ sessionId });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sessionId, chatContext]);
+    }, [sessionId]);
 
     const updateApiContext = (newContext) => {
         apiContextRef.current = newContext;
@@ -207,10 +277,11 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
     const updateMessage = async (response, index) => {
         const { response: assistantResponse, usage, id, model, tools_used } = response;
+        const assistantContent = unwrapAgentEnvelope(assistantResponse.content);
         const updatedState = [...chatContextRef.current];
         updatedState[index] = {
             ...updatedState[index],
-            assistant_content: assistantResponse.content,
+            assistant_content: assistantContent,
             input_tokens: usage ? usage.prompt_tokens : null,
             output_tokens: usage ? usage.completion_tokens : null,
             input_cost: usage ? usage.input_cost : null,
@@ -223,7 +294,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
         const updatedApiContext = [
             ...apiContextRef.current,
-            { role: 'assistant', content: assistantResponse.content, index, meta: response.meta ?? undefined  },
+            { role: 'assistant', content: assistantContent, index, meta: response.meta ?? undefined  },
         ];
         updateApiContext(updatedApiContext);
     };
@@ -279,7 +350,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                     },
                     (res) => {
                         if (res && res.response) {
-                            resolve(res.response.content);
+                            resolve(unwrapAgentEnvelope(res.response.content));
                         } else {
                             reject(new Error('Invalid summary response'));
                         }
@@ -408,7 +479,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                     if (res && res.response) {
                         if (payload.meta?.internal) {
                             // Inject only assistant message for internal triggers
-                            addMessage({ role: 'assistant', content: res.response.content });
+                            addMessage({ role: 'assistant', content: unwrapAgentEnvelope(res.response.content) });
                         } else {
                             updateMessage(res, userMessageIndex);
                         }

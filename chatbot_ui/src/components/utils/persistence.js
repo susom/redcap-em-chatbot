@@ -1,6 +1,9 @@
-// Persist Cappy widget UI state across page reloads, scoped per project (pid).
-// Used to reopen the chat in the same view/position with the active session
-// restored, but only if the last activity was recent (idle expiry).
+// Persist Cappy widget UI state (view, position, size, fullscreen) AND the
+// active chat sessionId in sessionStorage. Everything in here dies when
+// the tab closes — no client-side persistence beyond the tab. The actual
+// conversation is rebuilt on demand from server-side logs (see
+// rebuildSession in REDCapChatBot.php); we never write message content
+// to either browser store.
 
 const IDLE_MS = 60 * 60 * 1000; // 60 minutes
 
@@ -16,12 +19,12 @@ function getSessionKey() {
 
 export function loadUiState() {
     try {
-        const raw = localStorage.getItem(getScopeKey());
+        const raw = sessionStorage.getItem(getScopeKey());
         if (!raw) return null;
         const state = JSON.parse(raw);
         if (!state || typeof state.updatedAt !== 'number') return null;
         if (Date.now() - state.updatedAt > IDLE_MS) {
-            localStorage.removeItem(getScopeKey());
+            sessionStorage.removeItem(getScopeKey());
             return null;
         }
         return state;
@@ -32,10 +35,10 @@ export function loadUiState() {
 
 export function saveUiState(partial) {
     try {
-        const raw = localStorage.getItem(getScopeKey());
+        const raw = sessionStorage.getItem(getScopeKey());
         const prev = raw ? JSON.parse(raw) : {};
         const next = { ...prev, ...partial, updatedAt: Date.now() };
-        localStorage.setItem(getScopeKey(), JSON.stringify(next));
+        sessionStorage.setItem(getScopeKey(), JSON.stringify(next));
     } catch (e) {
         // ignore storage failures (private mode, quota, etc.)
     }
@@ -43,7 +46,7 @@ export function saveUiState(partial) {
 
 export function clearUiState() {
     try {
-        localStorage.removeItem(getScopeKey());
+        sessionStorage.removeItem(getScopeKey());
     } catch (e) {
         // ignore
     }
@@ -51,29 +54,29 @@ export function clearUiState() {
 
 // ---- Chat session (sessionStorage, per-tab) ----
 //
-// sessionStorage survives page reloads within the same tab but dies when the
-// tab closes — exactly what we want for "current chat follows you around the
-// project, but goes away when you leave". Per-project scoping avoids one
-// project's chat leaking into another when the user opens a different project
-// in a new tab.
+// We persist ONLY the sessionId. The actual conversation lives in
+// redcap_external_modules_log via SecureChatAI — see rebuildSession() in
+// REDCapChatBot.php. This keeps sessionStorage free of any message content
+// (PHI), and a single small string survives page navigations within the tab.
+// Per-project scoping avoids one project's session id leaking into another
+// when the user opens a different project in a new tab.
 
 export function loadChatSession() {
     try {
         const raw = sessionStorage.getItem(getSessionKey());
         if (!raw) return null;
         const data = JSON.parse(raw);
-        if (!data || typeof data.sessionId !== 'string' || !Array.isArray(data.messages)) return null;
-        return data;
+        if (!data || typeof data.sessionId !== 'string') return null;
+        return { sessionId: data.sessionId };
     } catch (e) {
         return null;
     }
 }
 
-export function saveChatSession({ sessionId, messages }) {
+export function saveChatSession({ sessionId }) {
     try {
         sessionStorage.setItem(getSessionKey(), JSON.stringify({
             sessionId,
-            messages,
             savedAt: Date.now(),
         }));
     } catch (e) {

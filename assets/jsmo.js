@@ -50,6 +50,23 @@
             } catch (err) {
                 errorCallback(err);
             }
+        },
+
+        rebuildSession: async (payload, callback, errorCallback) => {
+            try {
+                const res = await module.ajax('rebuildSession', payload);
+                let parsedRes;
+                try {
+                    parsedRes = (typeof res === 'string') ? JSON.parse(res) : res;
+                } catch (e) {
+                    console.error("rebuildSession: failed to parse response:", res);
+                    errorCallback(e);
+                    return;
+                }
+                callback(parsedRes);
+            } catch (err) {
+                errorCallback(err);
+            }
         }
     });
 }
