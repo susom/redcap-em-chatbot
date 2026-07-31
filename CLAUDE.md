@@ -63,3 +63,10 @@
 - Never commit/push unless explicitly asked
 - Small reviewable diffs; follow existing patterns; no new libraries without asking
 - When changing `records.search` behavior, keep `tools.json` descriptions and the SecureChatAI paging contract in sync across all three repos
+
+## Claude Rules (Infra — don't touch)
+- **NEVER touch the user's Docker / docker-compose / Apache / OPcache / services.** Infra is off-limits.
+- Code changes are live immediately (PHP-FPM reads files per request). No bounce needed.
+- If something doesn't work after a code change, **the code change is suspect** — debug the code, don't blame the runtime. Occam's razor.
+- The only legitimate runtime touch is `npm run build` after a JS source change. That's code compilation, not infra.
+- When in doubt about whether something is "infra", ask before touching it.
