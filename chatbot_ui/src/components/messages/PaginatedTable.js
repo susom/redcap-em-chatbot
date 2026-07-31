@@ -4,8 +4,17 @@ const parseMdTable = (md) => {
     if (!md) return null;
     const lines = md.trim().split('\n').filter(l => l.trim().startsWith('|'));
     if (lines.length < 2) return null;
-    const parseRow = (l) => l.trim().replace(/^\|/, '').replace(/\|$/, '')
-        .split('|').map(c => c.trim().replace(/\\\|/g, '|'));
+    // Split rows on UNESCAPED pipes. Markdown escapes pipes as \| so we swap
+    // them with a NUL placeholder, split on raw |, then restore. Without
+    // this, a value like 'before | after' (escaped as 'before \| after') gets
+    // parsed as TWO columns, breaking the table layout.
+    const parseRow = (l) => {
+        const trimmed = l.trim().replace(/^\|/, '').replace(/\|$/, '');
+        return trimmed
+            .replace(/\\\|/g, '\x00')
+            .split('|')
+            .map(c => c.trim().replace(/\x00/g, '|'));
+    };
     return { cols: parseRow(lines[0]), rows: lines.slice(2).map(parseRow) };
 };
 
