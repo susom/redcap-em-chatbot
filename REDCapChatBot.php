@@ -237,6 +237,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      * fallback path) and the inner JSON schema response leaked through.
      * Mirrors Chat.js::unwrapAgentEnvelope so server and client agree.
      *
+     * Handles three shapes:
+     *  1. Single JSON envelope:  {"final_answer": "..."}
+     *  2. Concatenated envelopes (some models emit both a tool_call and a
+     *     final_answer in one response, separated by whitespace):
+     *     {"tool_call": {...}}\n{"final_answer": "..."}
+     *  3. Plain text — returned unchanged.
+     *
      * @param string $content Raw assistant content from the log
      * @return string Plain text final answer, or the original string if not an envelope
      */
@@ -247,21 +254,116 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         if ($trimmed === '' || $trimmed[0] !== '{') return $content;
         // Strip markdown code fences just in case.
         $cleaned = trim(preg_replace('/^```json\s*|\s*```$/s', '', $trimmed));
-        $decoded = json_decode($cleaned, true);
-        if (!is_array($decoded)) return $content;
-        if (isset($decoded['final_answer']) && is_string($decoded['final_answer'])) {
-            return $decoded['final_answer'];
+
+        // Collect every balanced top-level JSON object in the string. Some
+        // models emit two consecutive envelopes (tool_call + final_answer)
+        // concatenated; treating the whole thing as one object fails to parse.
+        $envelopes = $this->extractJsonEnvelopes($cleaned);
+        if (empty($envelopes)) return $content;
+
+        // If any envelope has a final_answer/content/message, prefer the LAST
+        // one that does — that's the real final response when a tool_call
+        // envelope precedes it.
+        foreach (array_reverse($envelopes) as $env) {
+            if (isset($env['final_answer']) && is_string($env['final_answer'])) {
+                return $env['final_answer'];
+            }
+            if (isset($env['content']) && is_string($env['content'])) {
+                return $env['content'];
+            }
+            if (isset($env['message']) && is_string($env['message'])) {
+                return $env['message'];
+            }
         }
-        if (isset($decoded['content']) && is_string($decoded['content'])) {
-            return $decoded['content'];
-        }
-        if (isset($decoded['message']) && is_string($decoded['message'])) {
-            return $decoded['message'];
-        }
-        if (isset($decoded['tool_call'])) {
-            return "I apologize, but I wasn't able to complete that request properly. Could you try rephrasing?";
+        // All envelopes were tool_call-only (or empty) — caller should have
+        // skipped this message via isToolCallOnlyEnvelope. If we got here
+        // anyway, return the friendly placeholder rather than the raw JSON.
+        foreach ($envelopes as $env) {
+            if (!empty($env['tool_call'])) {
+                return "I apologize, but I wasn't able to complete that request properly. Could you try rephrasing?";
+            }
         }
         return $content;
+    }
+
+    /**
+     * Extract balanced top-level JSON objects from a string. Returns the
+     * decoded payload of each. Skips braces inside string literals.
+     *
+     * @param string $s
+     * @return array<int, array> Decoded envelopes (only those that parse)
+     */
+    private function extractJsonEnvelopes($s)
+    {
+        $out = [];
+        $len = strlen($s);
+        $i = 0;
+        while ($i < $len) {
+            if ($s[$i] !== '{') { $i++; continue; }
+            // Walk forward, tracking brace depth and skipping chars inside strings.
+            $start = $i;
+            $depth = 0;
+            $inString = false;
+            $escape = false;
+            for ($j = $i; $j < $len; $j++) {
+                $c = $s[$j];
+                if ($inString) {
+                    if ($escape) { $escape = false; continue; }
+                    if ($c === '\\') { $escape = true; continue; }
+                    if ($c === '"') { $inString = false; }
+                    continue;
+                }
+                if ($c === '"') { $inString = true; continue; }
+                if ($c === '{') { $depth++; continue; }
+                if ($c === '}') {
+                    $depth--;
+                    if ($depth === 0) {
+                        $candidate = substr($s, $start, $j - $start + 1);
+                        $decoded = json_decode($candidate, true);
+                        if (is_array($decoded)) $out[] = $decoded;
+                        $i = $j + 1;
+                        continue 2;
+                    }
+                }
+            }
+            // No balanced close — give up and stop scanning.
+            break;
+        }
+        return $out;
+    }
+
+    /**
+     * Detect an agent-mode JSON envelope that contains ONLY a tool_call —
+     * i.e. the model decided to invoke a tool but did not produce a final
+     * answer. In multi-step agent runs these are intermediate steps whose
+     * real final answer is logged in a later assistant row; on a broken run
+     * (max steps / parse error) they're the only record and unwrapAgentEnvelope
+     * would convert them to the "I apologize" friendly message, which is
+     * misleading when a later row exists.
+     *
+     * Handles single AND concatenated envelopes ({"tool_call":...}\n
+     * {"final_answer":...}). If ANY envelope in the string carries a
+     * final_answer/content/message, this returns false.
+     *
+     * @param string $content Raw assistant content from the audit log
+     * @return bool True if content is purely tool_call-shaped with no final answer
+     */
+    private function isToolCallOnlyEnvelope($content)
+    {
+        if (!is_string($content)) return false;
+        $trimmed = trim($content);
+        if ($trimmed === '' || $trimmed[0] !== '{') return false;
+        $cleaned = trim(preg_replace('/^```json\s*|\s*```$/s', '', $trimmed));
+        $envelopes = $this->extractJsonEnvelopes($cleaned);
+        if (empty($envelopes)) return false;
+        $hasToolCall = false;
+        foreach ($envelopes as $env) {
+            if (!empty($env['final_answer']) && is_string($env['final_answer'])) return false;
+            if (!empty($env['content']) && is_string($env['content'])) return false;
+            if (!empty($env['message']) && is_string($env['message'])) return false;
+            if (!empty($env['tool_call'])) $hasToolCall = true;
+        }
+        return $hasToolCall;
     }
 
     public function appendSystemContext($chatMlArray, $newContext) {
@@ -582,18 +684,42 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 if (!$scModule || !method_exists($scModule, 'rehydrateProjectSession')) {
                     return ["error" => true, "message" => "SecureChatAI module not available."];
                 }
-                $rehydrated = $scModule->rehydrateProjectSession($session_id, $pid);
+                // Scope rehydration to the authenticated user so a guessable
+                // client-generated session_id can't be used to rebuild another
+                // user's chat (possible PHI) within the same project.
+                $rehydrated = $scModule->rehydrateProjectSession($session_id, $pid, $user_id);
                 $raw_messages = is_array($rehydrated['messages'] ?? null) ? $rehydrated['messages'] : [];
 
                 // Adapt backend's {role, content, turn, tools_used} shape into
                 // the UI's {user_content, assistant_content, timestamp, meta, tools_used}
                 // shape so the existing restore loop in Chat.js works unchanged.
-                // Also unwrap any agent-mode JSON envelope ({final_answer|tool_call})
-                // that may have been persisted to the audit log verbatim.
+                // Also filter out internal agent-loop bookkeeping that leaked into
+                // the audit log (injected TOOL RESULT messages, intermediate
+                // tool_call-only assistant steps) so the chat history shows real
+                // user prompts and final answers, not the agent's trace.
                 $turns = [];
                 foreach ($raw_messages as $idx => $m) {
                     $role = $m['role'] ?? null;
                     $content = $m['content'] ?? '';
+
+                    // Skip injected TOOL RESULT lines. The agent loop adds these
+                    // as role:user messages for the next LLM step, but they are
+                    // not real user prompts.
+                    if ($role === 'user' && is_string($content)
+                        && strncmp(ltrim($content), 'TOOL RESULT [', 13) === 0) {
+                        continue;
+                    }
+
+                    // Skip assistant messages that are JSON envelopes containing
+                    // ONLY a tool_call (no final_answer/content/message). These
+                    // are intermediate agent-loop steps; the actual final answer
+                    // — if one was reached — is logged in a later assistant row
+                    // for the same turn.
+                    if ($role === 'assistant' && is_string($content) && $content !== ''
+                        && $this->isToolCallOnlyEnvelope($content)) {
+                        continue;
+                    }
+
                     if ($role === 'assistant' && is_string($content) && $content !== '') {
                         $content = $this->unwrapAgentEnvelope($content);
                     }
@@ -770,7 +896,36 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $override_params['session_id'] = $payload['session_id'];
                 }
 
-                $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid, $user_id);
+                // Internal calls (e.g. client-side compaction summary) set
+                // log_turn=false so they are excluded from turn-based rehydration.
+                if (array_key_exists('log_turn', $payload) && $payload['log_turn'] === false) {
+                    $override_params['log_turn'] = false;
+                }
+
+                // Release the PHP session write-lock for the (potentially long)
+                // agent loop so concurrent tabs — which share one session cookie
+                // — don't serialize behind it and time out. Safe because the
+                // record-tools recordset cache is now file-backed (not $_SESSION),
+                // so nothing in the loop needs the session write-lock. Reads of
+                // $_SESSION (e.g. username) still work after close. We re-open
+                // afterwards so REDCap's post-handler session bookkeeping runs.
+                //
+                // INVARIANT: code reachable from callAI() below (tools, hooks,
+                // SecureChatAI) must NOT WRITE $_SESSION — the session is closed,
+                // so writes are in-memory only and are discarded when
+                // session_start() re-reads from disk. If a future tool needs to
+                // persist per-request state, use the file cache, not $_SESSION.
+                $sessionWasActive = (session_status() === PHP_SESSION_ACTIVE);
+                if ($sessionWasActive) {
+                    session_write_close();
+                }
+                try {
+                    $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid, $user_id);
+                } finally {
+                    if ($sessionWasActive && session_status() !== PHP_SESSION_ACTIVE) {
+                        @session_start();
+                    }
+                }
                 $result = $this->formatResponse($response);
 
                 // PHI-safe: log response shape only, not the content.

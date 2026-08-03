@@ -112,6 +112,13 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     // restart), the sessionStorage flag is dropped and the user sees a
     // fresh chat.
     useEffect(() => {
+        // Cancellation guard: the iframe can be torn down (fast REDCap page
+        // navigation) while restoreSession is mid-wait or awaiting the ajax
+        // callback. Without this, the setTimeout chain keeps firing and setState
+        // runs on an unmounted component, and a late callback could clobber
+        // sessionStorage. The cleanup below flips this so all continuations bail.
+        let cancelled = false;
+
         const restoreSession = async () => {
             const persisted = loadChatSession();
             if (!persisted?.sessionId) return;
@@ -125,6 +132,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
             }
 
             const applyTurns = (queries) => {
+                if (cancelled) return;
                 chatContextRef.current = queries;
                 setChatContext(queries);
                 setMessages(queries);
@@ -150,8 +158,23 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                 lastExportedRef.current = rebuilt.length;
             };
 
-            if (!window.chatbot_jsmo_module?.rebuildSession) {
-                // JSMO not ready yet — bail; the sessionId is preserved for next mount.
+            // Wait for the JSMO bridge to be ready. On a fresh page load React
+            // can mount before ExternalModules finishes wiring
+            // window.chatbot_jsmo_module, so bailing here permanently (there is
+            // no second mount to retry on) was why chat CONTENT failed to
+            // rehydrate on navigation even though the UI state — restored
+            // synchronously, no JSMO needed — came back fine.
+            const waitForJsmo = async (tries = 40, delayMs = 150) => {
+                for (let i = 0; i < tries; i++) {
+                    if (cancelled) return false;
+                    if (window.chatbot_jsmo_module?.rebuildSession) return true;
+                    await new Promise(r => setTimeout(r, delayMs));
+                }
+                return false;
+            };
+            if (!(await waitForJsmo()) || cancelled) {
+                // Bridge never appeared (~6s) or we unmounted. Leave the
+                // sessionId in place so a later reload can retry; don't clear it.
                 return;
             }
 
@@ -160,6 +183,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                     window.chatbot_jsmo_module.rebuildSession(
                         { session_id: sid, pid },
                         (res) => {
+                            if (cancelled) { resolve(); return; }
                             if (res?.error) {
                                 // Backend says no — drop the stale flag, start fresh.
                                 clearChatSession();
@@ -187,6 +211,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
             }
         };
         restoreSession();
+        return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -346,7 +371,10 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                 window.chatbot_jsmo_module.callAI(
                     {
                         messages: [{ role: 'user', content: summaryPrompt }],
-                        session_id: sessionId
+                        session_id: sessionId,
+                        // Internal summarization call — must NOT be logged as a
+                        // real conversation turn (would pollute rehydration).
+                        log_turn: false
                     },
                     (res) => {
                         if (res && res.response) {
@@ -473,7 +501,11 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
                 window.chatbot_jsmo_module.callAI({
                     messages: contextToSend,
-                    session_id: sessionId
+                    session_id: sessionId,
+                    // Internal triggers (e.g. the invisible greeting) show only
+                    // the assistant reply in the UI, never the synthetic user
+                    // prompt — so don't log them as rehydratable turns either.
+                    log_turn: !payload.meta?.internal
                 }, (res) => {
                     setLoading(false); // Clear loading on success
                     if (res && res.response) {
