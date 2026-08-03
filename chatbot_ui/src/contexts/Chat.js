@@ -121,12 +121,28 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
         const restoreSession = async () => {
             const persisted = loadChatSession();
-            if (!persisted?.sessionId) return;
+            // TEMP client trace (PHI-safe: ids/keys only, never message content).
+            // Remove once the rehydration-miss is pinpointed.
+            try {
+                const cappyKeys = Object.keys(window.sessionStorage || {}).filter(k => k.startsWith('cappy_'));
+                console.info('[Cappy restore] start', {
+                    pid: window.cappy_project_config?.pid ?? null,
+                    found_saved_session: !!persisted?.sessionId,
+                    saved_session_id: persisted?.sessionId ?? null,
+                    sessionStorage_cappy_keys: cappyKeys,
+                });
+            } catch (e) { /* ignore */ }
+
+            if (!persisted?.sessionId) {
+                console.info('[Cappy restore] BAIL: no saved session id in sessionStorage');
+                return;
+            }
 
             const sid = persisted.sessionId;
             const pid = window.cappy_project_config?.pid;
             if (!pid) {
                 // No project context — can't scope the lookup; give up.
+                console.info('[Cappy restore] BAIL: no pid in cappy_project_config');
                 clearChatSession();
                 return;
             }
@@ -175,8 +191,10 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
             if (!(await waitForJsmo()) || cancelled) {
                 // Bridge never appeared (~6s) or we unmounted. Leave the
                 // sessionId in place so a later reload can retry; don't clear it.
+                console.info('[Cappy restore] BAIL: jsmo bridge not ready or cancelled');
                 return;
             }
+            console.info('[Cappy restore] calling rebuildSession', { session_id: sid, pid });
 
             try {
                 await new Promise((resolve) => {
@@ -186,16 +204,19 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                             if (cancelled) { resolve(); return; }
                             if (res?.error) {
                                 // Backend says no — drop the stale flag, start fresh.
+                                console.info('[Cappy restore] server returned error, clearing session', res?.message ?? '');
                                 clearChatSession();
                                 resolve();
                                 return;
                             }
                             const queries = Array.isArray(res?.messages) ? res.messages : [];
                             if (queries.length === 0) {
+                                console.info('[Cappy restore] server returned 0 turns, clearing session');
                                 clearChatSession();
                                 resolve();
                                 return;
                             }
+                            console.info('[Cappy restore] rebuilt', queries.length, 'turns');
                             applyTurns(queries);
                             resolve();
                         },
