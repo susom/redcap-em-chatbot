@@ -749,6 +749,21 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 ];
 
             case "callAI":
+                // Release the PHP session write-lock immediately. This handler
+                // does long LLM work (multi-second agent loops) and never WRITES
+                // $_SESSION (verified across all three EMs). PHP holds an
+                // exclusive per-session lock for the whole request, and all of a
+                // user's browser tabs share one session — so without this, a
+                // user's other tabs serialize behind this tab's agent loop and
+                // pile up until they look "stuck". Closing here holds the lock
+                // for only the few ms of framework bootstrap. Reads of $_SESSION
+                // still work after close. We deliberately do NOT re-open it:
+                // re-acquiring the lock at the end of the request just
+                // reintroduces the contention we are removing.
+                if (session_status() === PHP_SESSION_ACTIVE) {
+                    session_write_close();
+                }
+
                 // If no project context, use the RExI config project for settings
                 $config_pid = $project_id;
 
@@ -902,30 +917,11 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $override_params['log_turn'] = false;
                 }
 
-                // Release the PHP session write-lock for the (potentially long)
-                // agent loop so concurrent tabs — which share one session cookie
-                // — don't serialize behind it and time out. Safe because the
-                // record-tools recordset cache is now file-backed (not $_SESSION),
-                // so nothing in the loop needs the session write-lock. Reads of
-                // $_SESSION (e.g. username) still work after close. We re-open
-                // afterwards so REDCap's post-handler session bookkeeping runs.
-                //
-                // INVARIANT: code reachable from callAI() below (tools, hooks,
-                // SecureChatAI) must NOT WRITE $_SESSION — the session is closed,
-                // so writes are in-memory only and are discarded when
-                // session_start() re-reads from disk. If a future tool needs to
-                // persist per-request state, use the file cache, not $_SESSION.
-                $sessionWasActive = (session_status() === PHP_SESSION_ACTIVE);
-                if ($sessionWasActive) {
-                    session_write_close();
-                }
-                try {
-                    $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid, $user_id);
-                } finally {
-                    if ($sessionWasActive && session_status() !== PHP_SESSION_ACTIVE) {
-                        @session_start();
-                    }
-                }
+                // Session lock was already released at the top of this action, so
+                // the long agent loop below runs without blocking the user's
+                // other tabs. (See INVARIANT there: nothing in this path writes
+                // $_SESSION.)
+                $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid, $user_id);
                 $result = $this->formatResponse($response);
 
                 // PHI-safe: log response shape only, not the content.
