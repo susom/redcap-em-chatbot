@@ -742,6 +742,17 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     }
                 }
 
+                // TEMP DIAGNOSTIC (PHI-safe: counts/ids only, never content).
+                // Remove once the rehydration-miss is pinpointed.
+                $this->emDebug("rebuildSession", [
+                    'pid'             => $pid,
+                    'config_pid'      => $config_pid,
+                    'user_id'         => $user_id,          // REDCap login, not PHI
+                    'session_id'      => $session_id,       // client ms-timestamp, not PHI
+                    'raw_messages'    => count($raw_messages),
+                    'turns_returned'  => count($turns),
+                ]);
+
                 return [
                     'session_id' => $session_id,
                     'messages' => $turns,
