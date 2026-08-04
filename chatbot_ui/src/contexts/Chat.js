@@ -211,8 +211,16 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                             }
                             const queries = Array.isArray(res?.messages) ? res.messages : [];
                             if (queries.length === 0) {
-                                console.info('[Cappy restore] server returned 0 turns, clearing session');
-                                clearChatSession();
+                                // Do NOT wipe the session id here. A 0-turn result
+                                // is normal at the START of a session: the page can
+                                // load and rehydrate BEFORE the first turn is even
+                                // written. Wiping the id dropped the id the ACTIVE
+                                // conversation was still using, so the next
+                                // navigation found nothing to rebuild — the root of
+                                // the "spotty rehydration" bug. Keep the id; just
+                                // show a fresh chat. Once turns exist, a later
+                                // navigation will rebuild them.
+                                console.info('[Cappy restore] 0 turns — keeping id, fresh chat');
                                 resolve();
                                 return;
                             }
