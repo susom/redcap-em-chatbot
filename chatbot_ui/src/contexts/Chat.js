@@ -476,6 +476,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
     const callAjax = (payload, callback, skipAddMessage = false) => {
         setLoading(true); // Set loading to true when starting the call
+        setErrorMessage(null); // Clear any prior error so a new send starts fresh
 
         if (!injectedUsername.current && window.cappy_project_config?.current_user) {
             console.log("Injecting username message...", window.cappy_project_config?.current_user);
@@ -497,6 +498,56 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         }
 
         const userMessageIndex = chatContextRef.current.length - 1;
+
+        // SELF-HEAL: on a failed send, roll the optimistically-added user turn
+        // back out of BOTH the model context and the display, so a failure
+        // leaves the in-memory state exactly as it was before the attempt.
+        // Without this, a dead turn (a user message with no answer) lingers in
+        // the context the app holds in memory; every retry re-sends that broken
+        // state, which is why a stuck tab only recovered on a full page reload
+        // (reload wipes the in-memory context). This makes the NEXT send start
+        // clean — no reload needed. Skipped for internal sends (greeting), whose
+        // turn isn't shown to the user anyway.
+        const rollbackAttempt = () => {
+            if (skipAddMessage) return;
+            const api = apiContextRef.current.slice();
+            for (let i = api.length - 1; i >= 0; i--) {
+                if (api[i].role === 'user') { api.splice(i, 1); break; }
+            }
+            updateApiContext(api);
+
+            const chat = chatContextRef.current.slice();
+            for (let i = chat.length - 1; i >= 0; i--) {
+                if (chat[i] && chat[i].assistant_content == null && chat[i].user_content != null) {
+                    chat.splice(i, 1);
+                    break;
+                }
+            }
+            chatContextRef.current = chat;
+            setChatContext(chat);
+            setMessages(chat);
+            setMsgCount(chat.length);
+        };
+
+        // Single settle point: whichever of success / error / timeout fires
+        // first wins; the rest are ignored. Guarantees loading always clears.
+        let settled = false;
+        let failsafe = null;
+        const fail = (reason, detail) => {
+            if (settled) return;
+            settled = true;
+            if (failsafe) clearTimeout(failsafe);
+            setLoading(false);
+            rollbackAttempt();
+            setErrorMessage("I'm having trouble connecting right now. Please wait a moment and try again.");
+            // TEMP PHI-safe trace (keys/flags/roles only, never content): shows
+            // exactly what the client received when a send fails. Remove once the
+            // stuck-tab cause is confirmed.
+            try {
+                console.warn('[Cappy send] FAILED', { reason, detail, context_roles: apiContextRef.current.map(m => m.role) });
+            } catch (e) { /* ignore */ }
+            if (callback) callback();
+        };
 
         // Check if compression is needed before sending
         const handleCompressedCall = async () => {
@@ -520,6 +571,10 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                     throw new Error("chatbot_jsmo_module.callAI is unavailable");
                 }
 
+                // Failsafe: if neither callback ever fires (a truly hung
+                // request), recover anyway so loading never wedges the input.
+                failsafe = setTimeout(() => fail('timeout_failsafe', '45s'), 45000);
+
                 window.chatbot_jsmo_module.callAI({
                     messages: contextToSend,
                     session_id: sessionId,
@@ -528,8 +583,11 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                     // prompt — so don't log them as rehydratable turns either.
                     log_turn: !payload.meta?.internal
                 }, (res) => {
-                    setLoading(false); // Clear loading on success
+                    if (settled) return;
                     if (res && res.response) {
+                        settled = true;
+                        if (failsafe) clearTimeout(failsafe);
+                        setLoading(false); // Clear loading on success
                         if (payload.meta?.internal) {
                             // Inject only assistant message for internal triggers
                             addMessage({ role: 'assistant', content: unwrapAgentEnvelope(res.response.content) });
@@ -538,22 +596,16 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                         }
                         if (callback) callback();
                     } else {
-                        console.log("Unexpected response format:", res);
-                        setErrorMessage("I received an unexpected response. Please try again.");
-                        if (callback) callback();
+                        // 200 but no usable `response` field — prime suspect for
+                        // the stuck tab. Treat as failure and self-heal.
+                        fail('no_response_field', (res && typeof res === 'object') ? Object.keys(res) : typeof res);
                     }
                 }, (err) => {
-                    setLoading(false); // Clear loading on error
-                    console.log("callAI error", err);
-                    setErrorMessage("I'm having trouble connecting right now. Please wait a moment and try again.");
-                    if (callback) callback();
+                    fail('ajax_error', String(err && err.message ? err.message : err));
                 });
             } catch (err) {
-                // Any synchronous/async throw must clear loading so the input never sticks
-                setLoading(false);
                 console.error("callAjax failed:", err);
-                setErrorMessage("Something went wrong sending your message. Please try again.");
-                if (callback) callback();
+                fail('exception', String(err && err.message ? err.message : err));
             }
         };
 
