@@ -42,6 +42,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     public function redcap_every_page_top($project_id) {
+        // Cappy is a staff-facing tool. redcap_every_page_top fires on survey pages too
+        // (HtmlPage.php calls it for every rendered page), so bail before injecting anything
+        // into a participant-facing survey — and bail for anyone not logged in to REDCap.
+        if (!$this->isAuthenticatedRedcapUser()) {
+            return;
+        }
+
         // Hide EM API actions table from non-superusers on the project API page
         if (defined('PAGE') && PAGE === 'API/project_api' && !(defined('SUPER_USER') && SUPER_USER)) {
             echo '<style>#external-modules-api-actions { display: none !important; }</style>';
@@ -59,6 +66,101 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         } catch (\Exception $e) {
             \REDCap::logEvent('Exception injecting chatbot UI.', $e->getMessage());
         }
+    }
+
+    /**
+     * True for any participant-facing survey render (survey page, survey queue,
+     * acknowledgement page). Checks PAGE first — the idiom used elsewhere in
+     * modules-local — and falls back to the framework's own URL-based test.
+     */
+    private function isSurveyPage(): bool {
+        if (defined('PAGE') && strpos((string) PAGE, 'surveys/') === 0) {
+            return true;
+        }
+        if (class_exists('\ExternalModules\ExternalModules')
+            && \ExternalModules\ExternalModules::isSurveyPage()) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * The authenticated REDCap user for this request, honouring admin impersonation.
+     * Empty string when there is no logged-in user — survey respondents included,
+     * since the framework nulls them out.
+     */
+    private function currentUsername(): string {
+        $u = \ExternalModules\ExternalModules::getUsername();
+        return is_string($u) ? trim($u) : '';
+    }
+
+    /**
+     * True only if there is a real, logged-in REDCap user driving this request.
+     * Cappy is staff-facing: no anonymous / survey-respondent access, ever.
+     */
+    private function isAuthenticatedRedcapUser(): bool {
+        if ($this->isSurveyPage()) {
+            return false;
+        }
+        return $this->currentUsername() !== '';
+    }
+
+    /**
+     * True only if $username is actually on the user list for $project_id, with
+     * unexpired rights. REDCap super users pass, matching core's access model.
+     *
+     * Why this has to exist here: SecureChatAI's ProjectAccessPreHook short-circuits
+     * with "current session project is always in scope" — it trusts whatever pid we
+     * hand it as ToolContext->projectId and only checks redcap_user_rights for
+     * OTHER projects. So for the current project, this is the check. If we don't
+     * do it, nobody does.
+     */
+    private function userHasProjectAccess($project_id, ?string $username = null): bool {
+        $pid = (int) $project_id;
+        if ($pid <= 0) {
+            return false;
+        }
+        if ($username === null || $username === '') {
+            $username = $this->currentUsername();
+        }
+        if ($username === '') {
+            return false;
+        }
+        // Super users can reach every project in REDCap proper; don't be stricter here.
+        if (\ExternalModules\ExternalModules::isSuperUser()) {
+            return true;
+        }
+        // Expiration semantics mirror UserRights.php:1147 — expired once expiration is
+        // set and on/before today. It's a DATE column, so NULL is the only "never
+        // expires" marker; don't compare it to '' (strict mode rejects that).
+        $q = $this->query(
+            "SELECT 1 FROM redcap_user_rights
+             WHERE project_id = ? AND username = ?
+               AND (expiration IS NULL OR expiration > CURDATE())
+             LIMIT 1",
+            [$pid, $username]
+        );
+        return $q && $q->num_rows > 0;
+    }
+
+    /**
+     * Page-level guard for module pages. Emits a plain 403 and returns false when the
+     * request isn't a logged-in REDCap user, or isn't a member of $project_id.
+     * A null/empty $project_id means "no project context" (system-level RExI use),
+     * which only requires authentication.
+     */
+    public function requireProjectAccessOrDie($project_id = null): bool {
+        if (!$this->isAuthenticatedRedcapUser()) {
+            http_response_code(403);
+            echo 'Not authorized.';
+            return false;
+        }
+        if (!empty($project_id) && !$this->userHasProjectAccess($project_id)) {
+            http_response_code(403);
+            echo 'You do not have access to this project.';
+            return false;
+        }
+        return true;
     }
 
     public function injectJSMO($data = null, $init_method = null): void {
@@ -80,6 +182,22 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     public function injectIntegrationUI($project_id = null) {
+        // Never render the widget for someone who isn't a logged-in REDCap user.
+        if (!$this->isAuthenticatedRedcapUser()) {
+            return;
+        }
+        // In real project context, only render for members of THAT project. REDCap's
+        // own page gate should already have stopped a non-member, so this is belt and
+        // braces — but it's what keeps the widget from ever appearing to someone who
+        // reached a project page through a path that skipped that gate.
+        if (!empty($project_id) && !$this->userHasProjectAccess($project_id)) {
+            return;
+        }
+
+        // NOTE: the rexi-config-project fallback below is settings-only (title, intro,
+        // CSS, RAG namespaces) and is used by the system-level RExI dashboard, whose
+        // users are not necessarily members of the config project. No project DATA is
+        // reachable through it — the data paths (callAI/cappyPage) verify membership.
         $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
 
         if (!empty($config_pid)) {
@@ -625,6 +743,19 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     public function redcap_module_ajax($action, $payload, $project_id=null, $record, $instrument, $event_id, $repeat_instance,
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
+        // Hard floor for every action: a logged-in REDCap user, never a survey
+        // respondent. The framework's ajax verification proves the request came from
+        // a page we rendered for this user+pid, but it does not check that the user
+        // still has REDCap rights — so we check identity here and project membership
+        // per-action below.
+        if (!empty($survey_hash) || !empty($survey_queue_hash) || !empty($response_id)) {
+            return ["error" => true, "message" => "Not available from a survey."];
+        }
+        $username = $this->currentUsername();
+        if ($username === '') {
+            return ["error" => true, "message" => "Not authenticated."];
+        }
+
         switch ($action) {
             case "cappyPage":
                 // UI-driven pagination against the server-side session cache.
@@ -634,6 +765,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $pid = (int)($payload['pid'] ?? 0);
                 if (empty($config_pid) || $pid !== (int)$config_pid) {
                     return ["error" => true, "message" => "pid mismatch — can only page within the current project."];
+                }
+                // This returns record rows. Confirm the caller is on this project's user list.
+                if (!$this->userHasProjectAccess($pid, $username)) {
+                    return ["error" => true, "message" => "You do not have access to project {$pid}."];
                 }
                 $reference = $payload['reference'] ?? '';
                 if ($reference === '') {
@@ -777,6 +912,15 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
                 // If no project context, use the RExI config project for settings
                 $config_pid = $project_id;
+
+                // THE gate for project data. Whatever pid we pass down becomes
+                // SecureChatAI's ToolContext->projectId, and ProjectAccessPreHook
+                // auto-allows any tool call against "the current session project"
+                // without consulting redcap_user_rights. So membership has to be
+                // proven right here, or that fast-path is an open door.
+                if (!empty($config_pid) && !$this->userHasProjectAccess($config_pid, $username)) {
+                    return ["error" => true, "message" => "You do not have access to project {$config_pid}."];
+                }
 
                 // Extract messages and session_id from payload (new structure: {messages: [], session_id: string})
                 $messages = isset($payload['messages']) ? $this->sanitizeInput($payload['messages']) : $this->sanitizeInput($payload);
