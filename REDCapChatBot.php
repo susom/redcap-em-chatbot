@@ -71,14 +71,16 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     /**
      * True for any participant-facing survey render (survey page, survey queue,
      * acknowledgement page). Checks PAGE first — the idiom used elsewhere in
-     * modules-local — and falls back to the framework's own URL-based test.
+     * modules-local — and falls back to the framework's own inherited check.
+     * Named distinctly (not isSurveyPage) because AbstractExternalModule already
+     * declares that method as public — redeclaring it private is a fatal PHP
+     * visibility error, not just a naming clash.
      */
-    private function isSurveyPage(): bool {
+    private function cappyIsSurveyPage(): bool {
         if (defined('PAGE') && strpos((string) PAGE, 'surveys/') === 0) {
             return true;
         }
-        if (class_exists('\ExternalModules\ExternalModules')
-            && \ExternalModules\ExternalModules::isSurveyPage()) {
+        if ($this->isSurveyPage()) {
             return true;
         }
         return false;
@@ -99,7 +101,7 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
      * Cappy is staff-facing: no anonymous / survey-respondent access, ever.
      */
     private function isAuthenticatedRedcapUser(): bool {
-        if ($this->isSurveyPage()) {
+        if ($this->cappyIsSurveyPage()) {
             return false;
         }
         return $this->currentUsername() !== '';
