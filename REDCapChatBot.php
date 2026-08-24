@@ -1048,8 +1048,32 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $ragContext = [];
                 }
                 $this->emDebug("RAG result", ['doc_count' => count($ragContext)]);
+                // The retrieval query is the user's own chat message, so it is NOT
+                // logged — it can contain PHI. A short hash is enough to recognise the
+                // same question recurring across a turn (e.g. an agent re-retrieving
+                // in a loop) without putting the text in a flat file.
+                $ragQuery = (string)(end($messages)['content'] ?? '');
                 foreach ($ragContext as $doc) {
-                    $this->emDebug("GOT RAG?!", $doc);
+                    // Was emDebug("GOT RAG?!", $doc) — which dumped the ENTIRE retrieved
+                    // document, $doc['content'] included, on every hit. RAG namespaces
+                    // hold administrative/web content rather than record data, but a
+                    // full body dump per hit is still noise we don't want on disk.
+                    // meta_summary identifies the match better than a content snippet
+                    // and is bounded; fall back to a short content excerpt when absent.
+                    $ragSnippet = !empty($doc['meta_summary'])
+                        ? (string)$doc['meta_summary']
+                        : (string)($doc['content'] ?? '');
+                    $this->emDebug("RAG match", [
+                        'query_hash'     => substr(sha1($ragQuery), 0, 8),
+                        'query_length'   => strlen($ragQuery),
+                        'doc_id'         => $doc['id'] ?? null,
+                        'source'         => $doc['source'] ?? null,
+                        'similarity'     => $doc['similarity'] ?? null,
+                        'dense'          => $doc['dense'] ?? null,
+                        'sparse'         => $doc['sparse'] ?? null,
+                        'content_length' => strlen((string)($doc['content'] ?? '')),
+                        'snippet'        => mb_substr($ragSnippet, 0, 120),
+                    ]);
                     $messages = $this->appendSystemContext($messages, self::RAG_CONTEXT_PREFIX . $doc['content']);
                 }
 
