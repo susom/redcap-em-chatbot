@@ -11,6 +11,35 @@ import { ChatContext } from './contexts/Chat';
 import './App.css';
 import './assets/styles/global.css';
 
+// Wide view fills this fraction of the viewport in both axes.
+const FULLSCREEN_VIEWPORT_RATIO = 0.88;
+
+// ...except the WIDTH, which is also capped: past ~1400px a chat thread is mostly
+// empty gutter, and this is the width the layout was tuned against (88vw on a 15"
+// laptop ≈ 1480px). Height stays uncapped — more vertical room is always useful.
+// Lower this one number if wide view still reads too wide on very large monitors.
+const FULLSCREEN_MAX_WIDTH = 1400;
+
+const fullscreenHeight = () => Math.floor(window.innerHeight * FULLSCREEN_VIEWPORT_RATIO);
+
+// Wide-view geometry: capped size, centered in the viewport. Used by all four entry
+// points into fullscreen (restore-on-mount, auto-fullscreen on a table, the header
+// toggle, and the window-resize clamp) so they can't drift apart.
+const fullscreenBox = () => {
+    const width  = Math.min(
+        Math.floor(window.innerWidth * FULLSCREEN_VIEWPORT_RATIO),
+        FULLSCREEN_MAX_WIDTH
+    );
+    const height = fullscreenHeight();
+    return {
+        size: { width, height },
+        position: {
+            x: Math.floor((window.innerWidth  - width)  / 2),
+            y: Math.floor((window.innerHeight - height) / 2),
+        },
+    };
+};
+
 function App() {
     const { greet, chatContext } = useContext(ChatContext);
     const defaultExpandedWidth  = window?.cappy_project_config?.expanded_width  || 360;
@@ -75,12 +104,9 @@ function App() {
     // and doesn't actually fill the screen).
     useEffect(() => {
         if (isFullscreen) {
-            const fsWidth  = Math.floor(window.innerWidth  * 0.88);
-            const fsHeight = Math.floor(window.innerHeight * 0.88);
-            const cx = Math.floor((window.innerWidth  - fsWidth)  / 2);
-            const cy = Math.floor((window.innerHeight - fsHeight) / 2);
-            setSize({ width: fsWidth, height: fsHeight });
-            setDefaultPosition({ x: cx, y: cy });
+            const fs = fullscreenBox();
+            setSize(fs.size);
+            setDefaultPosition(fs.position);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -94,13 +120,9 @@ function App() {
         if (!last) return;
         // Markdown table = a separator line of pipes/dashes (| --- | --- |)
         if (!/^\s*\|[\s:|-]*---[\s:|-]*\|/m.test(last.assistant_content)) return;
-        const fsWidth  = Math.floor(window.innerWidth  * 0.88);
-        const fsHeight = Math.floor(window.innerHeight * 0.88);
-        setSize({ width: fsWidth, height: fsHeight });
-        setDefaultPosition({
-            x: Math.floor((window.innerWidth  - fsWidth)  / 2),
-            y: Math.floor((window.innerHeight - fsHeight) / 2),
-        });
+        const fs = fullscreenBox();
+        setSize(fs.size);
+        setDefaultPosition(fs.position);
         setIsFullscreen(true);
         window.parent.postMessage({ type: 'fullscreen-on' }, '*');
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,12 +185,9 @@ function App() {
                 setIsFullscreen(prev => {
                     const next = !prev;
                     if (next) {
-                        const fsWidth  = Math.floor(window.innerWidth  * 0.88);
-                        const fsHeight = Math.floor(window.innerHeight * 0.88);
-                        const cx = Math.floor((window.innerWidth  - fsWidth)  / 2);
-                        const cy = Math.floor((window.innerHeight - fsHeight) / 2);
-                        setSize({ width: fsWidth, height: fsHeight });
-                        setDefaultPosition({ x: cx, y: cy });
+                        const fs = fullscreenBox();
+                        setSize(fs.size);
+                        setDefaultPosition(fs.position);
                     } else {
                         setSize({ width: defaultExpandedWidth, height: defaultExpandedHeight });
                         // Anchor bottom-right to the badge's bottom-right so the
@@ -197,13 +216,9 @@ function App() {
             const vh = window.innerHeight;
 
             if (isFullscreen) {
-                const fsWidth  = Math.floor(vw * 0.88);
-                const fsHeight = Math.floor(vh * 0.88);
-                setSize({ width: fsWidth, height: fsHeight });
-                setDefaultPosition({
-                    x: Math.floor((vw - fsWidth)  / 2),
-                    y: Math.floor((vh - fsHeight) / 2),
-                });
+                const fs = fullscreenBox();
+                setSize(fs.size);
+                setDefaultPosition(fs.position);
                 return;
             }
 
@@ -251,7 +266,10 @@ function App() {
                 width={size.width}
                 height={size.height}
                 minConstraints={[320, 480]}
-                maxConstraints={[1400, 1000]}
+                // Must be >= the wide-view size, or grabbing the resize handle while in
+                // wide view snaps the panel down (ResizableBox passes the width/height
+                // props through unclamped, but clamps every drag to maxConstraints).
+                maxConstraints={[FULLSCREEN_MAX_WIDTH, Math.max(1000, fullscreenHeight())]}
                 onResize={(e, data) => setSize({ width: data.size.width, height: data.size.height })}
                 onResizeStop={(e, data) => setSize({ width: data.size.width, height: data.size.height })}
             >

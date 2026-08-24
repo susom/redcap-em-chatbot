@@ -30,7 +30,11 @@
     background: #2C2C2C; /* Assuming you want the same background */
     border-radius: 10px;
     border: 1px solid #999;
-    max-height: 80vh; /* Adjust this as necessary */
+    /* NO max-height here. This box's height comes from the inline height React sets on
+       the ResizableBox inside it, and App.js already clamps that to the viewport. A CSS
+       cap only ever shrinks the background out from under content that is still its
+       full height — which clipped the panel and left the white input bar hanging past
+       the bottom edge (wide view is 88vh, the old cap here was 80vh). */
     display: flex;
     flex-direction: column;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Adding shadow for depth */
@@ -46,6 +50,22 @@
    remains visible and clickable in every view (splash, expanded, fullscreen). */
 #chatbot_ui_container.cappy-fullscreen {
     z-index: 1000001;
+}
+
+/* The widget's header, body and footer are react-bootstrap <Container>s, and the
+   widget renders INSIDE the host page — so the host page's Bootstrap `.container`
+   rule applies to them. Both hosts cap it at 1320px (REDCap ships Bootstrap 5 in its
+   webpack bundle; pages/standalone_chat.php loads 5.3.3 off the CDN). That pinned the
+   chat content to 1320px however wide the panel got — invisible on a laptop, where
+   wide view is only ~1480px, but a several-hundred-pixel dead gutter on an external
+   monitor, with the absolutely-positioned footer left-flush while the static header
+   stayed centered. Scoped to our mount node so the host page's own containers are
+   untouched. */
+#chatbot_ui_container .container {
+    width: 100%;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
 }
 
 
