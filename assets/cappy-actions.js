@@ -62,8 +62,10 @@
     '  the list clearly matches the user\'s intent, ask for clarification instead',
     '  of guessing — highlighting the wrong control wastes the user\'s time and',
     '  erodes trust.',
-    '- page.fill — propose a value for a data-entry field (the user confirms before it writes).',
     '- page.clearHighlights — remove any rings.',
+    '- You cannot fill in, propose, or write values into any REDCap data-entry field.',
+    '  If asked to change a field value, say you cannot make data changes and the',
+    '  user must enter it themselves in REDCap.',
     'Data-entry fields are targetable by their REDCap variable name; buttons/links/tabs use the',
     'control_id from the list below.'
   ].join('\n');
@@ -686,8 +688,13 @@ function scanToText(s) {
         selector: args.selector
       };
     }
+    // WRITE DISABLED 2026-08-24: page.fill is gone from tools.json and from
+    // REDCapChatBot::redcap_module_api. Kept as an explicit branch (rather than
+    // relying on the return-null fallthrough) so the intent is greppable and a
+    // stray call is visible in the console. Restore via git history.
     if (name === 'page.fill') {
-      return { action: 'fill', field: args.field, value: args.value, label: args.label };
+      console.warn('[Cappy] page.fill is disabled — ignoring tool call');
+      return null;
     }
     if (name === 'page.clearHighlights') {
       return { action: 'clear_highlights' };

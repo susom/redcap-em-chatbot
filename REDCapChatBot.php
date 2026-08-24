@@ -727,11 +727,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     "note"   => "The highlight is being drawn on the user's page."
                 ];
 
+            // WRITE DISABLED 2026-08-24: guarantee no writing via Cappy agent mode. Also
+            // pulled from tools.json and from toClientAction() in assets/cappy-actions.js,
+            // so the browser ignores it too. Restore via git history, not by editing this.
             case "page_fill":
                 return [
-                    "status" => "proposed_awaiting_confirmation",
-                    "field"  => $payload['field'] ?? null,
-                    "note"   => "The value was proposed on the user's page; they must confirm before it is written."
+                    "error" => true,
+                    "message" => "page.fill is disabled — Cappy agent mode cannot modify page/form data."
                 ];
 
             case "page_clearHighlights":
@@ -969,6 +971,26 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     . "  4. If the user gives a hint about which fields to show (e.g. 'AGE, GENDER, RACE'), treat it as a CONCEPT, not a literal REDCap field name. Call projects.getMetadata, find the matching fields (e.g. d_legal_sex, d_race_unc, dob), and use them.\n"
                     . "  5. When a tool result includes 'reference', PREFER to page through the cache with offset/limit rather than re-running the full query. The reference is an INTERNAL SESSION HANDLE — never mention it in your response to the user. The user should not see strings like 'ref_7001308a' in the chat. Page through the data, render the result, and never echo the reference id back at the user.";
                 $initial_system_context = $table_hint . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
+
+                // READ-ONLY: Cappy has no write tools at all (records.save and page.fill were
+                // pulled from their tools.json manifests 2026-08-24). Stated here — in the
+                // SERVER-built prompt — so it reaches every entry path (in-project widget,
+                // standalone_chat.php, RExI-embedded iframe), not just pages where
+                // assets/cappy-actions.js injects its own guidance. Without this the model
+                // offers to make changes, the user confirms, and only then does it fail.
+                // MUST be prepended LAST so it lands FIRST in the system context — every
+                // block above prepends, and appendSystemContext() later appends the field
+                // index / form metadata / RAG docs, which would otherwise bury this.
+                $readonly_context = "READ-ONLY — YOU CANNOT CHANGE ANY DATA.\n"
+                    . "You have NO ability to create, update, overwrite, delete, or fill in any REDCap "
+                    . "record, field, form, or survey response. You have no write tools of any kind.\n"
+                    . "If the user asks you to change, set, update, correct, enter, or fill a value: say "
+                    . "PLAINLY and IMMEDIATELY that you cannot make data changes, and that they must make "
+                    . "the edit themselves in REDCap. You may help them find the right field or form "
+                    . "(use page.highlight to point at it) and tell them exactly what to enter.\n"
+                    . "NEVER offer to make a change, say you have made or proposed one, or ask the user to "
+                    . "'confirm' a change — there is nothing to confirm, because you cannot write.";
+                $initial_system_context = $readonly_context . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
 
                 //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
                 // 1. Slim field index (name → label for ALL fields) — default ON.

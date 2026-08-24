@@ -18,6 +18,16 @@
       "destructive": false
     },
     {
+      "name": "page.clearHighlights",
+      "description": "Remove any highlight rings currently drawn on the REDCap page the user is viewing.",
+      "action": "page_clearHighlights",
+      "parameters": { "type": "object", "properties": {} },
+      "readOnly": true,
+      "destructive": false
+    }
+  ],
+  "_disabled_tools_no_write_2026-08-24": [
+    {
       "name": "page.fill",
       "description": "Propose a value for a data-entry field on the REDCap page the user is currently viewing. The user is shown a confirmation prompt before the value is written to the page. Provide the REDCap field/variable name and the value.",
       "action": "page_fill",
@@ -31,14 +41,6 @@
         "required": ["field", "value"]
       },
       "readOnly": false,
-      "destructive": false
-    },
-    {
-      "name": "page.clearHighlights",
-      "description": "Remove any highlight rings currently drawn on the REDCap page the user is viewing.",
-      "action": "page_clearHighlights",
-      "parameters": { "type": "object", "properties": {} },
-      "readOnly": true,
       "destructive": false
     }
   ]
