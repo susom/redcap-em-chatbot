@@ -1053,6 +1053,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 // same question recurring across a turn (e.g. an agent re-retrieving
                 // in a loop) without putting the text in a flat file.
                 $ragQuery = (string)(end($messages)['content'] ?? '');
+                // Hoisted: loop-invariant, and there's no reason to re-hash the same
+                // query once per retrieved document.
+                $ragQueryHash = substr(sha1($ragQuery), 0, 8);
+                $ragQueryLength = strlen($ragQuery);
                 foreach ($ragContext as $doc) {
                     // Was emDebug("GOT RAG?!", $doc) — which dumped the ENTIRE retrieved
                     // document, $doc['content'] included, on every hit. RAG namespaces
@@ -1064,8 +1068,8 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                         ? (string)$doc['meta_summary']
                         : (string)($doc['content'] ?? '');
                     $this->emDebug("RAG match", [
-                        'query_hash'     => substr(sha1($ragQuery), 0, 8),
-                        'query_length'   => strlen($ragQuery),
+                        'query_hash'     => $ragQueryHash,
+                        'query_length'   => $ragQueryLength,
                         'doc_id'         => $doc['id'] ?? null,
                         'source'         => $doc['source'] ?? null,
                         'similarity'     => $doc['similarity'] ?? null,
