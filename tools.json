@@ -3,15 +3,15 @@
   "tools": [
     {
       "name": "page.highlight",
-      "description": "Highlight (draw a gold ring around) a field or element on the REDCap page the user is CURRENTLY viewing, to show them where to click or look. Use this whenever the user asks you to point to, show, highlight, or find something on the page. PREFERRED: pass `text` (a short descriptive phrase naming the control — e.g. 'Twilio SMS and Voice Call services'). The browser will deterministically keyword-match against the live page, so you don't have to pick the right control_id from a list. FALLBACKS: control_id (if you already know it) or field (only for actual REDCap data-entry fields).",
+      "description": "Draw a highlight ring around a field or control on the REDCap page the user is CURRENTLY viewing, to show them where to look or click. Use this whenever the user asks you to point at, show, or find something on the page. Provide EXACTLY ONE of: 'text' (preferred — a short phrase naming the control, keyword-matched against the live page), 'field' (a REDCap field name, data-entry fields only), or 'control_id'. The highlight is drawn in the user's browser after this returns, so a successful result means the request was sent, NOT that a match was found — tell the user what you highlighted and ask them to confirm they can see it rather than asserting it worked.",
       "action": "page_highlight",
       "parameters": {
         "type": "object",
         "properties": {
-          "text": { "type": "string", "description": "PREFERRED. A short descriptive phrase naming what to highlight (e.g. 'Twilio SMS', 'MyCap', 'SendGrid', 'Save button'). Browser keyword-matches against the live page." },
-          "field": { "type": "string", "description": "FALLBACK. REDCap variable/field name, only for data-entry fields." },
-          "control_id": { "type": "string", "description": "FALLBACK. control_id from the 'Page elements' list, only if you're sure." },
-          "label": { "type": "string", "description": "Optional human-friendly label to show on the highlight tooltip." }
+          "text": { "type": "string", "description": "Preferred. A short phrase naming what to highlight (e.g. 'Twilio SMS', 'Save button')." },
+          "field": { "type": "string", "description": "A REDCap field name. Data-entry fields only." },
+          "control_id": { "type": "string", "description": "A control_id from the 'Page elements' list." },
+          "label": { "type": "string", "description": "Optional label to show on the highlight tooltip." }
         }
       },
       "readOnly": true,
