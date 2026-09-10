@@ -71,7 +71,10 @@ This enables embedding Cappy in system-level dashboards (like RExI) while mainta
 **Architecture Documentation**:
 - **Dual context architecture**: `apiContext` (sent to AI) vs `chatContext` (UI display)
 - Compression only affects `apiContext`, full conversation history preserved in UI
-- Browser-only storage (IndexedDB via Dexie) - no server-side conversation persistence
+- No client-side conversation storage: only the active `sessionId` is kept in
+  `sessionStorage` (per-tab, per-pid). Message content is never written to the
+  browser; the durable copy lives in `redcap_external_modules_log` via SecureChatAI
+  and is replayed on demand by `rebuildSession()` in `REDCapChatBot.php`.
 
 ---
 

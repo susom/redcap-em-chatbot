@@ -44,14 +44,6 @@ export function saveUiState(partial) {
     }
 }
 
-export function clearUiState() {
-    try {
-        sessionStorage.removeItem(getScopeKey());
-    } catch (e) {
-        // ignore
-    }
-}
-
 // ---- Chat session (sessionStorage, per-tab) ----
 //
 // We persist ONLY the sessionId. The actual conversation lives in

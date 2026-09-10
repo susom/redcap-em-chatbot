@@ -1,16 +1,15 @@
 import React, { createContext, useState, useRef, useEffect } from 'react';
-import { loadUiState, saveUiState, loadChatSession, saveChatSession, clearChatSession } from '../components/utils/persistence';
+import { loadChatSession, saveChatSession, clearChatSession } from '../components/utils/persistence';
 
 export const ChatContext = createContext();
 
 export const ChatContextProvider = ({ children , projectContextRef}) => {
-    const persistedUi = loadUiState();
     const persistedSession = loadChatSession();
     const [apiContext, setApiContext] = useState([]);
     const [chatContext, setChatContext] = useState([]);
     const [showRatingPO, setShowRatingPO] = useState(false);
     const [sessionId, setSessionId] = useState(
-        persistedSession?.sessionId || persistedUi?.sessionId || Date.now().toString()
+        persistedSession?.sessionId || Date.now().toString()
     );
     const [messages, setMessages] = useState([]);
     const [msgCount, setMsgCount] = useState(0);
@@ -260,27 +259,13 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         setApiContext(newContext);
     };
 
-    const saveChatContext = async () => {
-        if (sessionId && chatContextRef.current.length > 0) {
-            // DISABLED: chat history persistence turned off.
-            // Re-enable both saves when the archive icon is back.
-            // saveUiState({ sessionId }); // refresh idle timer on activity
-            // const currentSession = await getSession(sessionId);
-            // if (currentSession) {
-            //     await updateSession(sessionId, chatContextRef.current);
-            // } else {
-            //     await saveNewSession(sessionId, Date.now(), chatContextRef.current);
-            // }
-        }
-    };
-
-    const updateChatContext = async (newContext, shouldSave = true) => {
+    // Chat history is never cached client-side. chatContext lives in memory for
+    // the life of the tab; the durable copy is redcap_external_modules_log via
+    // SecureChatAI, replayed by rebuildSession() in REDCapChatBot.php. Kept async
+    // because call sites await it.
+    const updateChatContext = async (newContext) => {
         chatContextRef.current = newContext;
         setChatContext(newContext);
-        // console.log("Updated chatContext:", newContext);
-        if (shouldSave) {
-            await saveChatContext(); // Save chat session after each update
-        }
     };
 
     const addMessage = (message) => {
@@ -475,13 +460,6 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         callAjax(payload, null, true);
     };
 
-    const replaceSession = async (session) => {
-        setSessionId(session.session_id);
-        setMessages(session.queries);
-        setMsgCount(session.queries.length);
-        updateChatContext(session.queries, false);
-    };
-
     const callAjax = (payload, callback, skipAddMessage = false) => {
         setLoading(true); // Set loading to true when starting the call
         setErrorMessage(null); // Clear any prior error so a new send starts fresh
@@ -653,7 +631,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     };
 
     return (
-        <ChatContext.Provider value={{ messages, addMessage, clearMessages, greet, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote, deleteInteraction, errorMessage, clearError, loading }}>
+        <ChatContext.Provider value={{ messages, addMessage, clearMessages, greet, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote, deleteInteraction, errorMessage, clearError, loading }}>
             {children}
         </ChatContext.Provider>
     );

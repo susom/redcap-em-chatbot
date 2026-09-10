@@ -3,7 +3,6 @@ import Header from './components/header/header';
 import Footer from './components/footer/footer';
 import Splash from './views/Splash';
 import Home from './views/Home';
-import History from './views/History';
 import Draggable from 'react-draggable';
 import ResizableContainer from './components/ResizableContainer';
 import { loadUiState, saveUiState } from './components/utils/persistence';
@@ -146,7 +145,7 @@ function App() {
                 y: window.innerHeight - 30 - 120,
             });
             window.parent.postMessage({ type: 'resize-cappy', source: 'splash', width: 120, height: 120 }, '*');
-        } else if (viewName === 'home' || viewName === 'history') {
+        } else if (viewName === 'home') {
             const config = window?.cappy_project_config || {};
             const w = config.expanded_width  || defaultExpandedWidth;
             const h = config.expanded_height || defaultExpandedHeight;
@@ -250,9 +249,6 @@ function App() {
     switch (currentView) {
         case 'home':
             ViewComponent = <Home changeView={changeView} />;
-            break;
-        case 'history':
-            ViewComponent = <History changeView={changeView} />;
             break;
         case 'splash':
         default:
