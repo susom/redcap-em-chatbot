@@ -40,6 +40,7 @@ use Stanford\SecureChatAI\ToolUse;
  * still can't fetch cross-project data.
  *
  * Rules:
+ *   - Tool is a client-side UI action (UI_ONLY_TOOLS) → ALLOW (no data surface)
  *   - Tool input has no pid / project_id             → DENY (fail-closed)
  *   - pid matches the current project                 → ALLOW
  *   - pid is non-empty but differs from current pid  → DENY
@@ -62,8 +63,37 @@ use Stanford\SecureChatAI\ToolUse;
  */
 class CappyScopePreHook implements PreToolUseHook
 {
+    /**
+     * Client-side UI tools, exempt from the pid requirement below.
+     *
+     * These are Cappy's own front-end actions (assets/cappy-actions.js): they
+     * draw or clear a highlight ring on the DOM of the page the user is already
+     * looking at. They reach no project data, no database, and no other project
+     * — there is nothing for a scope check to protect.
+     *
+     * They also have no 'pid' in their tools.json schema, so the fail-closed
+     * branch below denied EVERY call to them, unconditionally. That silently
+     * broke the highlight feature: the model was told (by the read-only system
+     * prompt) to use page.highlight to point at a field, every call came back
+     * denied, and the model retried until the loop detector killed the turn
+     * with a generic "I got stuck in a loop" apology.
+     *
+     * Keep this list to genuinely DOM-only tools. Anything that reads or writes
+     * project data must keep going through the pid check, even if adding pid to
+     * its schema is inconvenient.
+     */
+    private const UI_ONLY_TOOLS = [
+        'page.highlight',
+        'page.clearHighlights',
+    ];
+
     public function handle(ToolUse $use, ToolContext $context): HookResult
     {
+        // Exempt before anything else — these carry no pid by design.
+        if (in_array($use->name, self::UI_ONLY_TOOLS, true)) {
+            return HookResult::allow();
+        }
+
         $input = is_array($use->input) ? $use->input : [];
 
         // What the TOOL is asking to access.

@@ -102,6 +102,18 @@ export const Messages = () => {
         return toolsUsed.map(t => t?.name).filter(Boolean);
     };
 
+    // Collapse repeats for display: ["a","a","b"] → "a ×2, b". tools_used carries
+    // one entry per tool CALL, so a paging or retrying turn legitimately repeats a
+    // name and rendered as "records.search, records.search, records.search" — which
+    // reads like a glitch. Aggregates by name rather than by consecutive run, and
+    // keeps first-appearance order: this line is a summary of what ran, not an
+    // execution trace (the trace lives in the EM logs).
+    const formatToolNames = (names) => {
+        const counts = new Map();
+        names.forEach(n => counts.set(n, (counts.get(n) || 0) + 1));
+        return Array.from(counts, ([name, count]) => (count > 1 ? `${name} ×${count}` : name)).join(', ');
+    };
+
     return (
         <div className={`messages`}>
             {visibleMessages.length > 0 ? (
@@ -168,7 +180,7 @@ export const Messages = () => {
                                     )}
                                     {toolNames.length > 0 && (
                                         <div className="tool-usage">
-                                            Used tools: {toolNames.join(', ')}
+                                            Used tools: {formatToolNames(toolNames)}
                                         </div>
                                     )}
                                     {!window.cappy_project_config?.hide_message_meta && (

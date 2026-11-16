@@ -42,6 +42,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     public function redcap_every_page_top($project_id) {
+        // Cappy is a staff-facing tool. redcap_every_page_top fires on survey pages too
+        // (HtmlPage.php calls it for every rendered page), so bail before injecting anything
+        // into a participant-facing survey — and bail for anyone not logged in to REDCap.
+        if (!$this->isAuthenticatedRedcapUser()) {
+            return;
+        }
+
         // Hide EM API actions table from non-superusers on the project API page
         if (defined('PAGE') && PAGE === 'API/project_api' && !(defined('SUPER_USER') && SUPER_USER)) {
             echo '<style>#external-modules-api-actions { display: none !important; }</style>';
@@ -59,6 +66,103 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         } catch (\Exception $e) {
             \REDCap::logEvent('Exception injecting chatbot UI.', $e->getMessage());
         }
+    }
+
+    /**
+     * True for any participant-facing survey render (survey page, survey queue,
+     * acknowledgement page). Checks PAGE first — the idiom used elsewhere in
+     * modules-local — and falls back to the framework's own inherited check.
+     * Named distinctly (not isSurveyPage) because AbstractExternalModule already
+     * declares that method as public — redeclaring it private is a fatal PHP
+     * visibility error, not just a naming clash.
+     */
+    private function cappyIsSurveyPage(): bool {
+        if (defined('PAGE') && strpos((string) PAGE, 'surveys/') === 0) {
+            return true;
+        }
+        if ($this->isSurveyPage()) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * The authenticated REDCap user for this request, honouring admin impersonation.
+     * Empty string when there is no logged-in user — survey respondents included,
+     * since the framework nulls them out.
+     */
+    private function currentUsername(): string {
+        $u = \ExternalModules\ExternalModules::getUsername();
+        return is_string($u) ? trim($u) : '';
+    }
+
+    /**
+     * True only if there is a real, logged-in REDCap user driving this request.
+     * Cappy is staff-facing: no anonymous / survey-respondent access, ever.
+     */
+    private function isAuthenticatedRedcapUser(): bool {
+        if ($this->cappyIsSurveyPage()) {
+            return false;
+        }
+        return $this->currentUsername() !== '';
+    }
+
+    /**
+     * True only if $username is actually on the user list for $project_id, with
+     * unexpired rights. REDCap super users pass, matching core's access model.
+     *
+     * Why this has to exist here: SecureChatAI's ProjectAccessPreHook short-circuits
+     * with "current session project is always in scope" — it trusts whatever pid we
+     * hand it as ToolContext->projectId and only checks redcap_user_rights for
+     * OTHER projects. So for the current project, this is the check. If we don't
+     * do it, nobody does.
+     */
+    private function userHasProjectAccess($project_id, ?string $username = null): bool {
+        $pid = (int) $project_id;
+        if ($pid <= 0) {
+            return false;
+        }
+        if ($username === null || $username === '') {
+            $username = $this->currentUsername();
+        }
+        if ($username === '') {
+            return false;
+        }
+        // Super users can reach every project in REDCap proper; don't be stricter here.
+        if (\ExternalModules\ExternalModules::isSuperUser()) {
+            return true;
+        }
+        // Expiration semantics mirror UserRights.php:1147 — expired once expiration is
+        // set and on/before today. It's a DATE column, so NULL is the only "never
+        // expires" marker; don't compare it to '' (strict mode rejects that).
+        $q = $this->query(
+            "SELECT 1 FROM redcap_user_rights
+             WHERE project_id = ? AND username = ?
+               AND (expiration IS NULL OR expiration > CURDATE())
+             LIMIT 1",
+            [$pid, $username]
+        );
+        return $q && $q->num_rows > 0;
+    }
+
+    /**
+     * Page-level guard for module pages. Emits a plain 403 and returns false when the
+     * request isn't a logged-in REDCap user, or isn't a member of $project_id.
+     * A null/empty $project_id means "no project context" (system-level RExI use),
+     * which only requires authentication.
+     */
+    public function requireProjectAccessOrDie($project_id = null): bool {
+        if (!$this->isAuthenticatedRedcapUser()) {
+            http_response_code(403);
+            echo 'Not authorized.';
+            return false;
+        }
+        if (!empty($project_id) && !$this->userHasProjectAccess($project_id)) {
+            http_response_code(403);
+            echo 'You do not have access to this project.';
+            return false;
+        }
+        return true;
     }
 
     public function injectJSMO($data = null, $init_method = null): void {
@@ -80,6 +184,22 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
     }
 
     public function injectIntegrationUI($project_id = null) {
+        // Never render the widget for someone who isn't a logged-in REDCap user.
+        if (!$this->isAuthenticatedRedcapUser()) {
+            return;
+        }
+        // In real project context, only render for members of THAT project. REDCap's
+        // own page gate should already have stopped a non-member, so this is belt and
+        // braces — but it's what keeps the widget from ever appearing to someone who
+        // reached a project page through a path that skipped that gate.
+        if (!empty($project_id) && !$this->userHasProjectAccess($project_id)) {
+            return;
+        }
+
+        // NOTE: the rexi-config-project fallback below is settings-only (title, intro,
+        // CSS, RAG namespaces) and is used by the system-level RExI dashboard, whose
+        // users are not necessarily members of the config project. No project DATA is
+        // reachable through it — the data paths (callAI/cappyPage) verify membership.
         $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
 
         if (!empty($config_pid)) {
@@ -228,6 +348,142 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
         }
 
         return $formattedResponse;
+    }
+
+    /**
+     * Unwrap an agent-mode JSON envelope ({final_answer|tool_call|thinking})
+     * that may have been persisted to the audit log verbatim when the model
+     * was on a non-schema adapter (e.g. Claude served through the OpenAI
+     * fallback path) and the inner JSON schema response leaked through.
+     * Mirrors Chat.js::unwrapAgentEnvelope so server and client agree.
+     *
+     * Handles three shapes:
+     *  1. Single JSON envelope:  {"final_answer": "..."}
+     *  2. Concatenated envelopes (some models emit both a tool_call and a
+     *     final_answer in one response, separated by whitespace):
+     *     {"tool_call": {...}}\n{"final_answer": "..."}
+     *  3. Plain text — returned unchanged.
+     *
+     * @param string $content Raw assistant content from the log
+     * @return string Plain text final answer, or the original string if not an envelope
+     */
+    private function unwrapAgentEnvelope($content)
+    {
+        if (!is_string($content)) return $content;
+        $trimmed = trim($content);
+        if ($trimmed === '' || $trimmed[0] !== '{') return $content;
+        // Strip markdown code fences just in case.
+        $cleaned = trim(preg_replace('/^```json\s*|\s*```$/s', '', $trimmed));
+
+        // Collect every balanced top-level JSON object in the string. Some
+        // models emit two consecutive envelopes (tool_call + final_answer)
+        // concatenated; treating the whole thing as one object fails to parse.
+        $envelopes = $this->extractJsonEnvelopes($cleaned);
+        if (empty($envelopes)) return $content;
+
+        // If any envelope has a final_answer/content/message, prefer the LAST
+        // one that does — that's the real final response when a tool_call
+        // envelope precedes it.
+        foreach (array_reverse($envelopes) as $env) {
+            if (isset($env['final_answer']) && is_string($env['final_answer'])) {
+                return $env['final_answer'];
+            }
+            if (isset($env['content']) && is_string($env['content'])) {
+                return $env['content'];
+            }
+            if (isset($env['message']) && is_string($env['message'])) {
+                return $env['message'];
+            }
+        }
+        // All envelopes were tool_call-only (or empty) — caller should have
+        // skipped this message via isToolCallOnlyEnvelope. If we got here
+        // anyway, return the friendly placeholder rather than the raw JSON.
+        foreach ($envelopes as $env) {
+            if (!empty($env['tool_call'])) {
+                return "I apologize, but I wasn't able to complete that request properly. Could you try rephrasing?";
+            }
+        }
+        return $content;
+    }
+
+    /**
+     * Extract balanced top-level JSON objects from a string. Returns the
+     * decoded payload of each. Skips braces inside string literals.
+     *
+     * @param string $s
+     * @return array<int, array> Decoded envelopes (only those that parse)
+     */
+    private function extractJsonEnvelopes($s)
+    {
+        $out = [];
+        $len = strlen($s);
+        $i = 0;
+        while ($i < $len) {
+            if ($s[$i] !== '{') { $i++; continue; }
+            // Walk forward, tracking brace depth and skipping chars inside strings.
+            $start = $i;
+            $depth = 0;
+            $inString = false;
+            $escape = false;
+            for ($j = $i; $j < $len; $j++) {
+                $c = $s[$j];
+                if ($inString) {
+                    if ($escape) { $escape = false; continue; }
+                    if ($c === '\\') { $escape = true; continue; }
+                    if ($c === '"') { $inString = false; }
+                    continue;
+                }
+                if ($c === '"') { $inString = true; continue; }
+                if ($c === '{') { $depth++; continue; }
+                if ($c === '}') {
+                    $depth--;
+                    if ($depth === 0) {
+                        $candidate = substr($s, $start, $j - $start + 1);
+                        $decoded = json_decode($candidate, true);
+                        if (is_array($decoded)) $out[] = $decoded;
+                        $i = $j + 1;
+                        continue 2;
+                    }
+                }
+            }
+            // No balanced close — give up and stop scanning.
+            break;
+        }
+        return $out;
+    }
+
+    /**
+     * Detect an agent-mode JSON envelope that contains ONLY a tool_call —
+     * i.e. the model decided to invoke a tool but did not produce a final
+     * answer. In multi-step agent runs these are intermediate steps whose
+     * real final answer is logged in a later assistant row; on a broken run
+     * (max steps / parse error) they're the only record and unwrapAgentEnvelope
+     * would convert them to the "I apologize" friendly message, which is
+     * misleading when a later row exists.
+     *
+     * Handles single AND concatenated envelopes ({"tool_call":...}\n
+     * {"final_answer":...}). If ANY envelope in the string carries a
+     * final_answer/content/message, this returns false.
+     *
+     * @param string $content Raw assistant content from the audit log
+     * @return bool True if content is purely tool_call-shaped with no final answer
+     */
+    private function isToolCallOnlyEnvelope($content)
+    {
+        if (!is_string($content)) return false;
+        $trimmed = trim($content);
+        if ($trimmed === '' || $trimmed[0] !== '{') return false;
+        $cleaned = trim(preg_replace('/^```json\s*|\s*```$/s', '', $trimmed));
+        $envelopes = $this->extractJsonEnvelopes($cleaned);
+        if (empty($envelopes)) return false;
+        $hasToolCall = false;
+        foreach ($envelopes as $env) {
+            if (!empty($env['final_answer']) && is_string($env['final_answer'])) return false;
+            if (!empty($env['content']) && is_string($env['content'])) return false;
+            if (!empty($env['message']) && is_string($env['message'])) return false;
+            if (!empty($env['tool_call'])) $hasToolCall = true;
+        }
+        return $hasToolCall;
     }
 
     public function appendSystemContext($chatMlArray, $newContext) {
@@ -471,11 +727,13 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     "note"   => "The highlight is being drawn on the user's page."
                 ];
 
+            // WRITE DISABLED 2026-08-24: guarantee no writing via Cappy agent mode. Also
+            // pulled from tools.json and from toClientAction() in assets/cappy-actions.js,
+            // so the browser ignores it too. Restore via git history, not by editing this.
             case "page_fill":
                 return [
-                    "status" => "proposed_awaiting_confirmation",
-                    "field"  => $payload['field'] ?? null,
-                    "note"   => "The value was proposed on the user's page; they must confirm before it is written."
+                    "error" => true,
+                    "message" => "page.fill is disabled — Cappy agent mode cannot modify page/form data."
                 ];
 
             case "page_clearHighlights":
@@ -489,6 +747,19 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
 
     public function redcap_module_ajax($action, $payload, $project_id=null, $record, $instrument, $event_id, $repeat_instance,
                                        $survey_hash, $response_id, $survey_queue_hash, $page, $page_full, $user_id, $group_id) {
+        // Hard floor for every action: a logged-in REDCap user, never a survey
+        // respondent. The framework's ajax verification proves the request came from
+        // a page we rendered for this user+pid, but it does not check that the user
+        // still has REDCap rights — so we check identity here and project membership
+        // per-action below.
+        if (!empty($survey_hash) || !empty($survey_queue_hash) || !empty($response_id)) {
+            return ["error" => true, "message" => "Not available from a survey."];
+        }
+        $username = $this->currentUsername();
+        if ($username === '') {
+            return ["error" => true, "message" => "Not authenticated."];
+        }
+
         switch ($action) {
             case "cappyPage":
                 // UI-driven pagination against the server-side session cache.
@@ -498,6 +769,10 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                 $pid = (int)($payload['pid'] ?? 0);
                 if (empty($config_pid) || $pid !== (int)$config_pid) {
                     return ["error" => true, "message" => "pid mismatch — can only page within the current project."];
+                }
+                // This returns record rows. Confirm the caller is on this project's user list.
+                if (!$this->userHasProjectAccess($pid, $username)) {
+                    return ["error" => true, "message" => "You do not have access to project {$pid}."];
                 }
                 $reference = $payload['reference'] ?? '';
                 if ($reference === '') {
@@ -523,9 +798,133 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     "truncated" => !empty($result['truncated']),
                 ];
 
+            case "rebuildSession":
+                // Reconstruct a chat session from server-side logs by session_id.
+                // The client only persists sessionId in sessionStorage (no message
+                // content) — on page navigation it pings this endpoint to pull
+                // the conversation back out of redcap_external_modules_log via
+                // SecureChatAI::rehydrateProjectSession.
+                $config_pid = $project_id ?: $this->getSystemSetting('rexi-config-project');
+                $pid = (int)($payload['pid'] ?? 0);
+                if (empty($config_pid) || $pid !== (int)$config_pid) {
+                    return ["error" => true, "message" => "pid mismatch — can only rebuild within the current project."];
+                }
+                $session_id = (string)($payload['session_id'] ?? '');
+                if ($session_id === '') {
+                    return ["error" => true, "message" => "Missing session_id."];
+                }
+                // Reject anything that doesn't look like our client-generated session_id
+                // (Date.now().toString() — digits only, up to ~16 chars). Defense-in-depth
+                // so the SQL LIKE fallback can't be tricked by weird characters.
+                if (!preg_match('/^\d{1,20}$/', $session_id)) {
+                    return ["error" => true, "message" => "Invalid session_id."];
+                }
+                $scModule = \ExternalModules\ExternalModules::getModuleInstance('secure_chat_ai');
+                if (!$scModule || !method_exists($scModule, 'rehydrateProjectSession')) {
+                    return ["error" => true, "message" => "SecureChatAI module not available."];
+                }
+                // Scope rehydration to the authenticated user so a guessable
+                // client-generated session_id can't be used to rebuild another
+                // user's chat (possible PHI) within the same project.
+                $rehydrated = $scModule->rehydrateProjectSession($session_id, $pid, $user_id);
+                $raw_messages = is_array($rehydrated['messages'] ?? null) ? $rehydrated['messages'] : [];
+
+                // Adapt backend's {role, content, turn, tools_used} shape into
+                // the UI's {user_content, assistant_content, timestamp, meta, tools_used}
+                // shape so the existing restore loop in Chat.js works unchanged.
+                // Also filter out internal agent-loop bookkeeping that leaked into
+                // the audit log (injected TOOL RESULT messages, intermediate
+                // tool_call-only assistant steps) so the chat history shows real
+                // user prompts and final answers, not the agent's trace.
+                $turns = [];
+                foreach ($raw_messages as $idx => $m) {
+                    $role = $m['role'] ?? null;
+                    $content = $m['content'] ?? '';
+
+                    // Skip injected TOOL RESULT lines. The agent loop adds these
+                    // as role:user messages for the next LLM step, but they are
+                    // not real user prompts.
+                    if ($role === 'user' && is_string($content)
+                        && strncmp(ltrim($content), 'TOOL RESULT [', 13) === 0) {
+                        continue;
+                    }
+
+                    // Skip assistant messages that are JSON envelopes containing
+                    // ONLY a tool_call (no final_answer/content/message). These
+                    // are intermediate agent-loop steps; the actual final answer
+                    // — if one was reached — is logged in a later assistant row
+                    // for the same turn.
+                    if ($role === 'assistant' && is_string($content) && $content !== ''
+                        && $this->isToolCallOnlyEnvelope($content)) {
+                        continue;
+                    }
+
+                    if ($role === 'assistant' && is_string($content) && $content !== '') {
+                        $content = $this->unwrapAgentEnvelope($content);
+                    }
+                    if ($role === 'user') {
+                        $turns[] = [
+                            'user_content' => $content,
+                            'assistant_content' => null,
+                            'timestamp' => is_numeric($m['turn'] ?? null) ? (int)$m['turn'] : ($idx + 1),
+                            'meta' => null,
+                            'tools_used' => null,
+                        ];
+                    } elseif ($role === 'assistant') {
+                        $turns[] = [
+                            'user_content' => null,
+                            'assistant_content' => $content,
+                            'timestamp' => is_numeric($m['turn'] ?? null) ? (int)$m['turn'] : ($idx + 1),
+                            'meta' => null,
+                            'tools_used' => !empty($m['tools_used']) ? $m['tools_used'] : null,
+                        ];
+                    }
+                }
+
+                // TEMP DIAGNOSTIC (PHI-safe: counts/ids only, never content).
+                // Remove once the rehydration-miss is pinpointed.
+                $this->emDebug("rebuildSession", [
+                    'pid'             => $pid,
+                    'config_pid'      => $config_pid,
+                    'user_id'         => $user_id,          // REDCap login, not PHI
+                    'session_id'      => $session_id,       // client ms-timestamp, not PHI
+                    'raw_messages'    => count($raw_messages),
+                    'turns_returned'  => count($turns),
+                ]);
+
+                return [
+                    'session_id' => $session_id,
+                    'messages' => $turns,
+                    'total' => count($turns),
+                ];
+
             case "callAI":
+                // Release the PHP session write-lock immediately. This handler
+                // does long LLM work (multi-second agent loops) and never WRITES
+                // $_SESSION (verified across all three EMs). PHP holds an
+                // exclusive per-session lock for the whole request, and all of a
+                // user's browser tabs share one session — so without this, a
+                // user's other tabs serialize behind this tab's agent loop and
+                // pile up until they look "stuck". Closing here holds the lock
+                // for only the few ms of framework bootstrap. Reads of $_SESSION
+                // still work after close. We deliberately do NOT re-open it:
+                // re-acquiring the lock at the end of the request just
+                // reintroduces the contention we are removing.
+                if (session_status() === PHP_SESSION_ACTIVE) {
+                    session_write_close();
+                }
+
                 // If no project context, use the RExI config project for settings
                 $config_pid = $project_id;
+
+                // THE gate for project data. Whatever pid we pass down becomes
+                // SecureChatAI's ToolContext->projectId, and ProjectAccessPreHook
+                // auto-allows any tool call against "the current session project"
+                // without consulting redcap_user_rights. So membership has to be
+                // proven right here, or that fast-path is an open door.
+                if (!empty($config_pid) && !$this->userHasProjectAccess($config_pid, $username)) {
+                    return ["error" => true, "message" => "You do not have access to project {$config_pid}."];
+                }
 
                 // Extract messages and session_id from payload (new structure: {messages: [], session_id: string})
                 $messages = isset($payload['messages']) ? $this->sanitizeInput($payload['messages']) : $this->sanitizeInput($payload);
@@ -563,15 +962,36 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     . "| 51        | Jane Doe      | MRN1000510  |\n"
                     . "```\n"
                     . "NEVER put the whole table on a single line. NEVER use bullet points or comma-separated prose for tabular data. If the table is long, paginate with a header every ~20 rows and a one-line note like '(continued)' between sections.\n"
-                    . "ALWAYS SHOW THE DATA — when a records tool returns record data, the user wants to SEE it. When the tool result contains 'preview_markdown', render it VERBATIM as the table in your response (you may add a one-line summary above it like 'Showing 20 of 432'), then offer to show more or filter further. NEVER reply with only a count plus 'which fields would you like to see?' — the preview columns were already chosen sensibly (record_id + filter fields + most-populated fields). If the user later asks for different fields, re-render from the data you already have or page the reference.\n"
+                    . "ALWAYS SHOW THE DATA — when a records tool returns record data, the user wants to SEE it. When the tool result contains 'preview_markdown', render it VERBATIM as the table in your response (you may add a one-line summary above it like 'Showing 20 of 432'), then offer to show more or filter further. NEVER reply with only a count plus 'which fields would you like to see?' — when the user has not said which columns they want, the preview picks sensible ones for you. When the user DOES name the columns they want (now or in a follow-up), re-run records.search with columns=[field names] and render the new preview_markdown — do NOT hand-build a table from raw rows, because choice codes are only resolved to labels inside preview_markdown.\n"
                     . "\n"
                     . "TOOL USAGE DISCIPLINE — these failure modes keep recurring. Avoid them:\n"
-                    . "  1. NEVER ask the user for REDCap variable/field names. Call projects.getMetadata(pid=<pid>) to find them yourself, then call records.search with the field names you discovered.\n"
-                    . "  2. NEVER say 'the result is too large to display here' or refuse on size grounds. Large results return a 'reference' parameter that you re-call the same tool with (records.search(pid=70, reference=\"ref_xxxxxxxx\", offset=N, limit=M)) to page through the server-side cache. The cache is in the PHP session and survives the chat lifetime.\n"
+                    . "  1. NEVER ask the user for REDCap variable/field names. Resolve them yourself from the field index above, then call records.search with the field names you found. Only call projects.getMetadata when you need a field's DEFINITION (answer choices, validation, branching) — and pass fields=[...] when you do, because an unscoped call returns only a partial slim list.\n"
+                    . "  2. LARGE RESULT HANDLING — when a tool returns total_record_count > 500, the preview_markdown is too noisy to be useful and the model loses coherence trying to narrate around a huge table. Instead of dumping the preview, briefly narrate the result count (e.g. '432 records match — that's a lot to show at once') and ask the user to narrow the query by adding a filter or restricting to a date range (to show fewer COLUMNS rather than fewer records, re-run with columns=[...]). Don't pretend the answer is unknowable — the data exists, the user just needs a more specific question. If the user insists on seeing all records despite the warning, fall back to paging with reference + offset/limit (records.search(pid=70, reference=\"ref_xxxxxxxx\", offset=N, limit=M)) — there is no hard cap, only a suggestion to narrow.\n"
                     . "  3. NEVER say 'I got stuck in a loop' or apologize for the same misunderstanding. If a tool returned data you didn't expect, re-read the tool result and try a different approach. Don't make the user rephrase the same request.\n"
-                    . "  4. If the user gives a hint about which fields to show (e.g. 'AGE, GENDER, RACE'), treat it as a CONCEPT, not a literal REDCap field name. Call projects.getMetadata, find the matching fields (e.g. d_legal_sex, d_race_unc, dob), and use them.\n"
+                    . "  4. If the user gives a hint about which fields to show (e.g. 'AGE, GENDER, RACE'), treat it as a CONCEPT, not a literal REDCap field name. Match it against the field index above (e.g. d_legal_sex, d_race_unc, dob) and use the field names you find.\n"
+                    . "  6. CODED VALUES ARE ALREADY TRANSLATED FOR YOU. records.get returns 'values' and records.search returns 'preview_markdown' with every coded field resolved to its choice LABEL server-side — 'Female', not '2'; checkbox fields list the checked option labels. Report those labels as given. NEVER ask the user to supply a code-to-label mapping, never present bare integer codes as an answer, and never translate codes from memory — the resolution is done from the project's own data dictionary and is authoritative. If you somehow have only codes, call records.get for the record (or projects.getMetadata with fields=[...] for that field's choices) instead of asking the user.\n"
                     . "  5. When a tool result includes 'reference', PREFER to page through the cache with offset/limit rather than re-running the full query. The reference is an INTERNAL SESSION HANDLE — never mention it in your response to the user. The user should not see strings like 'ref_7001308a' in the chat. Page through the data, render the result, and never echo the reference id back at the user.";
                 $initial_system_context = $table_hint . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
+
+                // READ-ONLY: Cappy has no write tools at all (records.save and page.fill were
+                // pulled from their tools.json manifests 2026-08-24). Stated here — in the
+                // SERVER-built prompt — so it reaches every entry path (in-project widget,
+                // standalone_chat.php, RExI-embedded iframe), not just pages where
+                // assets/cappy-actions.js injects its own guidance. Without this the model
+                // offers to make changes, the user confirms, and only then does it fail.
+                // MUST be prepended LAST so it lands FIRST in the system context — every
+                // block above prepends, and appendSystemContext() later appends the field
+                // index / form metadata / RAG docs, which would otherwise bury this.
+                $readonly_context = "READ-ONLY — YOU CANNOT CHANGE ANY DATA.\n"
+                    . "You have NO ability to create, update, overwrite, delete, or fill in any REDCap "
+                    . "record, field, form, or survey response. You have no write tools of any kind.\n"
+                    . "If the user asks you to change, set, update, correct, enter, or fill a value: say "
+                    . "PLAINLY and IMMEDIATELY that you cannot make data changes, and that they must make "
+                    . "the edit themselves in REDCap. You may help them find the right field or form "
+                    . "(use page.highlight to point at it) and tell them exactly what to enter.\n"
+                    . "NEVER offer to make a change, say you have made or proposed one, or ask the user to "
+                    . "'confirm' a change — there is nothing to confirm, because you cannot write.";
+                $initial_system_context = $readonly_context . (!empty($initial_system_context) ? "\n\n" . $initial_system_context : '');
 
                 //ADD IN PROJECT DICTIONARY IF IN PROJECT CONTEXT
                 // 1. Slim field index (name → label for ALL fields) — default ON.
@@ -629,8 +1049,36 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $ragContext = [];
                 }
                 $this->emDebug("RAG result", ['doc_count' => count($ragContext)]);
+                // The retrieval query is the user's own chat message, so it is NOT
+                // logged — it can contain PHI. A short hash is enough to recognise the
+                // same question recurring across a turn (e.g. an agent re-retrieving
+                // in a loop) without putting the text in a flat file.
+                $ragQuery = (string)(end($messages)['content'] ?? '');
+                // Hoisted: loop-invariant, and there's no reason to re-hash the same
+                // query once per retrieved document.
+                $ragQueryHash = substr(sha1($ragQuery), 0, 8);
+                $ragQueryLength = strlen($ragQuery);
                 foreach ($ragContext as $doc) {
-                    $this->emDebug("GOT RAG?!", $doc);
+                    // Was emDebug("GOT RAG?!", $doc) — which dumped the ENTIRE retrieved
+                    // document, $doc['content'] included, on every hit. RAG namespaces
+                    // hold administrative/web content rather than record data, but a
+                    // full body dump per hit is still noise we don't want on disk.
+                    // meta_summary identifies the match better than a content snippet
+                    // and is bounded; fall back to a short content excerpt when absent.
+                    $ragSnippet = !empty($doc['meta_summary'])
+                        ? (string)$doc['meta_summary']
+                        : (string)($doc['content'] ?? '');
+                    $this->emDebug("RAG match", [
+                        'query_hash'     => $ragQueryHash,
+                        'query_length'   => $ragQueryLength,
+                        'doc_id'         => $doc['id'] ?? null,
+                        'source'         => $doc['source'] ?? null,
+                        'similarity'     => $doc['similarity'] ?? null,
+                        'dense'          => $doc['dense'] ?? null,
+                        'sparse'         => $doc['sparse'] ?? null,
+                        'content_length' => strlen((string)($doc['content'] ?? '')),
+                        'snippet'        => mb_substr($ragSnippet, 0, 120),
+                    ]);
                     $messages = $this->appendSystemContext($messages, self::RAG_CONTEXT_PREFIX . $doc['content']);
                 }
 
@@ -671,6 +1119,16 @@ class REDCapChatBot extends \ExternalModules\AbstractExternalModule {
                     $override_params['session_id'] = $payload['session_id'];
                 }
 
+                // Internal calls (e.g. client-side compaction summary) set
+                // log_turn=false so they are excluded from turn-based rehydration.
+                if (array_key_exists('log_turn', $payload) && $payload['log_turn'] === false) {
+                    $override_params['log_turn'] = false;
+                }
+
+                // Session lock was already released at the top of this action, so
+                // the long agent loop below runs without blocking the user's
+                // other tabs. (See INVARIANT there: nothing in this path writes
+                // $_SESSION.)
                 $response = $this->getSecureChatInstance()->callAI($model, $override_params, $config_pid, $user_id);
                 $result = $this->formatResponse($response);
 

@@ -1,19 +1,18 @@
 import React, { createContext, useState, useRef, useEffect } from 'react';
-import { loadUiState, saveUiState, loadChatSession, saveChatSession, clearChatSession } from '../components/utils/persistence';
+import { loadChatSession, saveChatSession, clearChatSession } from '../components/utils/persistence';
 
 export const ChatContext = createContext();
 
 export const ChatContextProvider = ({ children , projectContextRef}) => {
-    const persistedUi = loadUiState();
     const persistedSession = loadChatSession();
     const [apiContext, setApiContext] = useState([]);
-    const [chatContext, setChatContext] = useState(persistedSession?.messages || []);
+    const [chatContext, setChatContext] = useState([]);
     const [showRatingPO, setShowRatingPO] = useState(false);
     const [sessionId, setSessionId] = useState(
-        persistedSession?.sessionId || persistedUi?.sessionId || Date.now().toString()
+        persistedSession?.sessionId || Date.now().toString()
     );
-    const [messages, setMessages] = useState(persistedSession?.messages || []);
-    const [msgCount, setMsgCount] = useState(persistedSession?.messages?.length || 0);
+    const [messages, setMessages] = useState([]);
+    const [msgCount, setMsgCount] = useState(0);
     const [errorMessage, setErrorMessage] = useState(null);
     const [loading, setLoading] = useState(false);
 
@@ -24,6 +23,33 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     const CONVERSATION_SUMMARY_LABEL = "Previous Conversation Summary";
     const injectedUsername = useRef(false);
     const hasGreeted = useRef(false);
+
+    // Defensive: if the assistant content somehow arrives as an agent-mode
+    // JSON envelope ({"final_answer":"..."} or {"tool_call":{...}}), unwrap
+    // it before we store/display it. Normally SecureChatAI's sanitizeOutputForUI
+    // handles this server-side; this is a backstop for any path that leaks
+    // the raw JSON (e.g. older builds, replayed history, fallback models).
+    const unwrapAgentEnvelope = (content) => {
+        if (typeof content !== 'string') return content;
+        const trimmed = content.trim();
+        if (!trimmed.startsWith('{')) return content;
+        // Strip code fences just in case.
+        const cleaned = trimmed.replace(/^```json\s*|\s*```$/g, '').trim();
+        try {
+            const obj = JSON.parse(cleaned);
+            if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+                if (typeof obj.final_answer === 'string') return obj.final_answer;
+                if (typeof obj.content === 'string') return obj.content;
+                if (typeof obj.message === 'string') return obj.message;
+                if (obj.tool_call) {
+                    return "I apologize, but I wasn't able to complete that request properly. Could you try rephrasing?";
+                }
+            }
+        } catch (e) {
+            // Not JSON — leave alone.
+        }
+        return content;
+    };
 
     // Context compression settings
     const COMPRESSION_THRESHOLD = 20; // Trigger compression after 20 messages
@@ -77,86 +103,169 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Restore the active chat from sessionStorage on mount (per-tab, per-project).
-    // Rebuilds apiContext from saved turns so the conversation continues across
-    // page navigations within the same tab.
+    // Restore the active chat on mount by pulling history from the server
+    // using just the sessionId persisted in sessionStorage. The actual
+    // conversation lives in redcap_external_modules_log (via SecureChatAI),
+    // so we never store message content client-side. If the server has no
+    // record of the session (e.g. cleared logs, different tab, server
+    // restart), the sessionStorage flag is dropped and the user sees a
+    // fresh chat.
     useEffect(() => {
+        // Cancellation guard: the iframe can be torn down (fast REDCap page
+        // navigation) while restoreSession is mid-wait or awaiting the ajax
+        // callback. Without this, the setTimeout chain keeps firing and setState
+        // runs on an unmounted component, and a late callback could clobber
+        // sessionStorage. The cleanup below flips this so all continuations bail.
+        let cancelled = false;
+
         const restoreSession = async () => {
             const persisted = loadChatSession();
-            if (!persisted?.sessionId || !Array.isArray(persisted.messages) || persisted.messages.length === 0) return;
+            // TEMP client trace (PHI-safe: ids/keys only, never message content).
+            // Remove once the rehydration-miss is pinpointed.
+            try {
+                const cappyKeys = Object.keys(window.sessionStorage || {}).filter(k => k.startsWith('cappy_'));
+                console.info('[Cappy restore] start', {
+                    pid: window.cappy_project_config?.pid ?? null,
+                    found_saved_session: !!persisted?.sessionId,
+                    saved_session_id: persisted?.sessionId ?? null,
+                    sessionStorage_cappy_keys: cappyKeys,
+                });
+            } catch (e) { /* ignore */ }
 
-            const queries = persisted.messages;
-            chatContextRef.current = queries;
-            setChatContext(queries);
-            setMessages(queries);
-            setMsgCount(queries.length);
+            if (!persisted?.sessionId) {
+                console.info('[Cappy restore] BAIL: no saved session id in sessionStorage');
+                return;
+            }
 
-            // Rebuild apiContext (ChatML) from saved display turns
-            const rebuilt = [];
-            queries.forEach((q, i) => {
-                if (q.user_content) {
-                    rebuilt.push({ role: 'user', content: q.user_content, index: i, meta: q.meta ?? undefined });
+            const sid = persisted.sessionId;
+            const pid = window.cappy_project_config?.pid;
+            if (!pid) {
+                // No project context — can't scope the lookup; give up.
+                console.info('[Cappy restore] BAIL: no pid in cappy_project_config');
+                clearChatSession();
+                return;
+            }
+
+            const applyTurns = (queries) => {
+                if (cancelled) return;
+                chatContextRef.current = queries;
+                setChatContext(queries);
+                setMessages(queries);
+                setMsgCount(queries.length);
+
+                const rebuilt = [];
+                queries.forEach((q, i) => {
+                    if (q.user_content) {
+                        rebuilt.push({ role: 'user', content: unwrapAgentEnvelope(q.user_content), index: i, meta: q.meta ?? undefined });
+                    }
+                    if (q.assistant_content) {
+                        rebuilt.push({ role: 'assistant', content: unwrapAgentEnvelope(q.assistant_content), index: i });
+                    }
+                });
+                apiContextRef.current = rebuilt;
+                setApiContext(rebuilt);
+
+                const hasUsername = queries.some(
+                    q => q.meta?.internal && typeof q.user_content === 'string' && q.user_content.startsWith('My name is')
+                );
+                if (hasUsername) injectedUsername.current = true;
+
+                lastExportedRef.current = rebuilt.length;
+            };
+
+            // Wait for the JSMO bridge to be ready. On a fresh page load React
+            // can mount before ExternalModules finishes wiring
+            // window.chatbot_jsmo_module, so bailing here permanently (there is
+            // no second mount to retry on) was why chat CONTENT failed to
+            // rehydrate on navigation even though the UI state — restored
+            // synchronously, no JSMO needed — came back fine.
+            const waitForJsmo = async (tries = 40, delayMs = 150) => {
+                for (let i = 0; i < tries; i++) {
+                    if (cancelled) return false;
+                    if (window.chatbot_jsmo_module?.rebuildSession) return true;
+                    await new Promise(r => setTimeout(r, delayMs));
                 }
-                if (q.assistant_content) {
-                    rebuilt.push({ role: 'assistant', content: q.assistant_content, index: i });
-                }
-            });
-            apiContextRef.current = rebuilt;
-            setApiContext(rebuilt);
+                return false;
+            };
+            if (!(await waitForJsmo()) || cancelled) {
+                // Bridge never appeared (~6s) or we unmounted. Leave the
+                // sessionId in place so a later reload can retry; don't clear it.
+                console.info('[Cappy restore] BAIL: jsmo bridge not ready or cancelled');
+                return;
+            }
+            console.info('[Cappy restore] calling rebuildSession', { session_id: sid, pid });
 
-            // Don't re-inject the username greeting if it's already in history
-            const hasUsername = queries.some(
-                q => q.meta?.internal && typeof q.user_content === 'string' && q.user_content.startsWith('My name is')
-            );
-            if (hasUsername) injectedUsername.current = true;
-
-            // Delta export pointer starts at the end of restored history
-            lastExportedRef.current = rebuilt.length;
+            try {
+                await new Promise((resolve) => {
+                    window.chatbot_jsmo_module.rebuildSession(
+                        { session_id: sid, pid },
+                        (res) => {
+                            if (cancelled) { resolve(); return; }
+                            if (res?.error) {
+                                // Backend says no — drop the stale flag, start fresh.
+                                console.info('[Cappy restore] server returned error, clearing session', res?.message ?? '');
+                                clearChatSession();
+                                resolve();
+                                return;
+                            }
+                            const queries = Array.isArray(res?.messages) ? res.messages : [];
+                            if (queries.length === 0) {
+                                // Do NOT wipe the session id here. A 0-turn result
+                                // is normal at the START of a session: the page can
+                                // load and rehydrate BEFORE the first turn is even
+                                // written. Wiping the id dropped the id the ACTIVE
+                                // conversation was still using, so the next
+                                // navigation found nothing to rebuild — the root of
+                                // the "spotty rehydration" bug. Keep the id; just
+                                // show a fresh chat. Once turns exist, a later
+                                // navigation will rebuild them.
+                                console.info('[Cappy restore] 0 turns — keeping id, fresh chat');
+                                resolve();
+                                return;
+                            }
+                            console.info('[Cappy restore] rebuilt', queries.length, 'turns');
+                            applyTurns(queries);
+                            resolve();
+                        },
+                        (err) => {
+                            console.warn('[Cappy] rebuildSession failed:', err);
+                            // Don't drop the flag on transport error — page reload can retry.
+                            resolve();
+                        }
+                    );
+                });
+            } catch (e) {
+                console.warn('[Cappy] rebuildSession exception:', e);
+            }
         };
         restoreSession();
+        return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Persist the active chat to sessionStorage on every change. sessionStorage
-    // survives page reloads within the same tab — so navigating between REDCap
-    // pages keeps the conversation alive. Dies on tab close (no archives).
-    // Debounced because chatContext can update many times per second during
-    // streaming responses; sessionStorage is synchronous and would block UI.
+    // Mirror sessionId → sessionStorage so a page reload can find the
+    // session again via rebuildSession. Only the id is persisted — never
+    // any message content. clearMessages() calls clearChatSession()
+    // separately before this fires, so its sequence works as:
+    //   clearChatSession() → setSessionId(newId) → this effect saves newId.
     useEffect(() => {
-        if (!sessionId || chatContext.length === 0) return;
-        const timer = setTimeout(() => {
-            saveChatSession({ sessionId, messages: chatContext });
-        }, 250);
-        return () => clearTimeout(timer);
+        if (!sessionId) return;
+        saveChatSession({ sessionId });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sessionId, chatContext]);
+    }, [sessionId]);
 
     const updateApiContext = (newContext) => {
         apiContextRef.current = newContext;
         setApiContext(newContext);
     };
 
-    const saveChatContext = async () => {
-        if (sessionId && chatContextRef.current.length > 0) {
-            // DISABLED: chat history persistence turned off.
-            // Re-enable both saves when the archive icon is back.
-            // saveUiState({ sessionId }); // refresh idle timer on activity
-            // const currentSession = await getSession(sessionId);
-            // if (currentSession) {
-            //     await updateSession(sessionId, chatContextRef.current);
-            // } else {
-            //     await saveNewSession(sessionId, Date.now(), chatContextRef.current);
-            // }
-        }
-    };
-
-    const updateChatContext = async (newContext, shouldSave = true) => {
+    // Chat history is never cached client-side. chatContext lives in memory for
+    // the life of the tab; the durable copy is redcap_external_modules_log via
+    // SecureChatAI, replayed by rebuildSession() in REDCapChatBot.php. Kept async
+    // because call sites await it.
+    const updateChatContext = async (newContext) => {
         chatContextRef.current = newContext;
         setChatContext(newContext);
-        // console.log("Updated chatContext:", newContext);
-        if (shouldSave) {
-            await saveChatContext(); // Save chat session after each update
-        }
     };
 
     const addMessage = (message) => {
@@ -207,10 +316,11 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
     const updateMessage = async (response, index) => {
         const { response: assistantResponse, usage, id, model, tools_used } = response;
+        const assistantContent = unwrapAgentEnvelope(assistantResponse.content);
         const updatedState = [...chatContextRef.current];
         updatedState[index] = {
             ...updatedState[index],
-            assistant_content: assistantResponse.content,
+            assistant_content: assistantContent,
             input_tokens: usage ? usage.prompt_tokens : null,
             output_tokens: usage ? usage.completion_tokens : null,
             input_cost: usage ? usage.input_cost : null,
@@ -223,7 +333,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
 
         const updatedApiContext = [
             ...apiContextRef.current,
-            { role: 'assistant', content: assistantResponse.content, index, meta: response.meta ?? undefined  },
+            { role: 'assistant', content: assistantContent, index, meta: response.meta ?? undefined  },
         ];
         updateApiContext(updatedApiContext);
     };
@@ -275,11 +385,14 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                 window.chatbot_jsmo_module.callAI(
                     {
                         messages: [{ role: 'user', content: summaryPrompt }],
-                        session_id: sessionId
+                        session_id: sessionId,
+                        // Internal summarization call — must NOT be logged as a
+                        // real conversation turn (would pollute rehydration).
+                        log_turn: false
                     },
                     (res) => {
                         if (res && res.response) {
-                            resolve(res.response.content);
+                            resolve(unwrapAgentEnvelope(res.response.content));
                         } else {
                             reject(new Error('Invalid summary response'));
                         }
@@ -347,15 +460,9 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         callAjax(payload, null, true);
     };
 
-    const replaceSession = async (session) => {
-        setSessionId(session.session_id);
-        setMessages(session.queries);
-        setMsgCount(session.queries.length);
-        updateChatContext(session.queries, false);
-    };
-
     const callAjax = (payload, callback, skipAddMessage = false) => {
         setLoading(true); // Set loading to true when starting the call
+        setErrorMessage(null); // Clear any prior error so a new send starts fresh
 
         if (!injectedUsername.current && window.cappy_project_config?.current_user) {
             console.log("Injecting username message...", window.cappy_project_config?.current_user);
@@ -377,6 +484,56 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
         }
 
         const userMessageIndex = chatContextRef.current.length - 1;
+
+        // SELF-HEAL: on a failed send, roll the optimistically-added user turn
+        // back out of BOTH the model context and the display, so a failure
+        // leaves the in-memory state exactly as it was before the attempt.
+        // Without this, a dead turn (a user message with no answer) lingers in
+        // the context the app holds in memory; every retry re-sends that broken
+        // state, which is why a stuck tab only recovered on a full page reload
+        // (reload wipes the in-memory context). This makes the NEXT send start
+        // clean — no reload needed. Skipped for internal sends (greeting), whose
+        // turn isn't shown to the user anyway.
+        const rollbackAttempt = () => {
+            if (skipAddMessage) return;
+            const api = apiContextRef.current.slice();
+            for (let i = api.length - 1; i >= 0; i--) {
+                if (api[i].role === 'user') { api.splice(i, 1); break; }
+            }
+            updateApiContext(api);
+
+            const chat = chatContextRef.current.slice();
+            for (let i = chat.length - 1; i >= 0; i--) {
+                if (chat[i] && chat[i].assistant_content == null && chat[i].user_content != null) {
+                    chat.splice(i, 1);
+                    break;
+                }
+            }
+            chatContextRef.current = chat;
+            setChatContext(chat);
+            setMessages(chat);
+            setMsgCount(chat.length);
+        };
+
+        // Single settle point: whichever of success / error / timeout fires
+        // first wins; the rest are ignored. Guarantees loading always clears.
+        let settled = false;
+        let failsafe = null;
+        const fail = (reason, detail) => {
+            if (settled) return;
+            settled = true;
+            if (failsafe) clearTimeout(failsafe);
+            setLoading(false);
+            rollbackAttempt();
+            setErrorMessage("I'm having trouble connecting right now. Please wait a moment and try again.");
+            // TEMP PHI-safe trace (keys/flags/roles only, never content): shows
+            // exactly what the client received when a send fails. Remove once the
+            // stuck-tab cause is confirmed.
+            try {
+                console.warn('[Cappy send] FAILED', { reason, detail, context_roles: apiContextRef.current.map(m => m.role) });
+            } catch (e) { /* ignore */ }
+            if (callback) callback();
+        };
 
         // Check if compression is needed before sending
         const handleCompressedCall = async () => {
@@ -400,36 +557,41 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
                     throw new Error("chatbot_jsmo_module.callAI is unavailable");
                 }
 
+                // Failsafe: if neither callback ever fires (a truly hung
+                // request), recover anyway so loading never wedges the input.
+                failsafe = setTimeout(() => fail('timeout_failsafe', '45s'), 45000);
+
                 window.chatbot_jsmo_module.callAI({
                     messages: contextToSend,
-                    session_id: sessionId
+                    session_id: sessionId,
+                    // Internal triggers (e.g. the invisible greeting) show only
+                    // the assistant reply in the UI, never the synthetic user
+                    // prompt — so don't log them as rehydratable turns either.
+                    log_turn: !payload.meta?.internal
                 }, (res) => {
-                    setLoading(false); // Clear loading on success
+                    if (settled) return;
                     if (res && res.response) {
+                        settled = true;
+                        if (failsafe) clearTimeout(failsafe);
+                        setLoading(false); // Clear loading on success
                         if (payload.meta?.internal) {
                             // Inject only assistant message for internal triggers
-                            addMessage({ role: 'assistant', content: res.response.content });
+                            addMessage({ role: 'assistant', content: unwrapAgentEnvelope(res.response.content) });
                         } else {
                             updateMessage(res, userMessageIndex);
                         }
                         if (callback) callback();
                     } else {
-                        console.log("Unexpected response format:", res);
-                        setErrorMessage("I received an unexpected response. Please try again.");
-                        if (callback) callback();
+                        // 200 but no usable `response` field — prime suspect for
+                        // the stuck tab. Treat as failure and self-heal.
+                        fail('no_response_field', (res && typeof res === 'object') ? Object.keys(res) : typeof res);
                     }
                 }, (err) => {
-                    setLoading(false); // Clear loading on error
-                    console.log("callAI error", err);
-                    setErrorMessage("I'm having trouble connecting right now. Please wait a moment and try again.");
-                    if (callback) callback();
+                    fail('ajax_error', String(err && err.message ? err.message : err));
                 });
             } catch (err) {
-                // Any synchronous/async throw must clear loading so the input never sticks
-                setLoading(false);
                 console.error("callAjax failed:", err);
-                setErrorMessage("Something went wrong sending your message. Please try again.");
-                if (callback) callback();
+                fail('exception', String(err && err.message ? err.message : err));
             }
         };
 
@@ -469,7 +631,7 @@ export const ChatContextProvider = ({ children , projectContextRef}) => {
     };
 
     return (
-        <ChatContext.Provider value={{ messages, addMessage, clearMessages, greet, replaceSession, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote, deleteInteraction, errorMessage, clearError, loading }}>
+        <ChatContext.Provider value={{ messages, addMessage, clearMessages, greet, showRatingPO, setShowRatingPO, msgCount, setMsgCount, sessionId, setSessionId, callAjax, chatContext, updateChatContext, updateVote, deleteInteraction, errorMessage, clearError, loading }}>
             {children}
         </ChatContext.Provider>
     );

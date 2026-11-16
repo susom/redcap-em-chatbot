@@ -6,6 +6,13 @@
 // 2. Otherwise use the RExI config project (system setting)
 // 3. If neither, skip project settings and fallback to system settings only
 $current_pid = isset($_GET['pid']) ? $_GET['pid'] : null;
+
+// Staff-only, project-members-only. pid comes straight off the URL here, so verify
+// it rather than trusting the caller — this page can be reached directly by URL.
+if (!$module->requireProjectAccessOrDie($current_pid)) {
+    return;
+}
+
 $config_pid = $current_pid ?: $module->getSystemSetting('rexi-config-project');
 
 // Only fetch project settings if we have a valid config project, otherwise use system defaults
